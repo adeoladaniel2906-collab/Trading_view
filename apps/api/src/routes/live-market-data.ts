@@ -22,7 +22,7 @@ const intervalSeconds: Partial<Record<Timeframe, number>> = {
   "12h": 43_200, "1d": 86_400, "3d": 259_200, "1w": 604_800,
 };
 
-function candleInterval(timeframe: Timeframe, candleTime: number): number | undefined {
+export function candleInterval(timeframe: Timeframe, candleTime: number): number | undefined {
   if (timeframe !== "1M") return intervalSeconds[timeframe];
   const date = new Date(candleTime * 1000);
   const next = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
@@ -131,11 +131,18 @@ export async function registerLiveMarketDataRoutes(
       if (heartbeat) clearInterval(heartbeat);
       unsubscribe?.();
     };
+    const sendNamedEvent = (name: string, data: unknown) => {
+      if (!response || closed) return;
+      if (!emit(response, name, data)) {
+        cleanup();
+        response.end();
+      }
+    };
 
     const sendHealth = (state: FeedHealth["state"], unresolvedFrom: number | null = null) => {
       if (!response) return;
       const providerId = subscription.market === "crypto" ? "binance" : "twelve-data";
-      emit(response, "feed-health", makeHealth(subscription, providerId, state, lastEventAt, lastReceivedAt, unresolvedFrom));
+      sendNamedEvent("feed-health", makeHealth(subscription, providerId, state, lastEventAt, lastReceivedAt, unresolvedFrom));
     };
 
     const reconcile = async (unresolvedFrom: number) => {
@@ -151,7 +158,7 @@ export async function registerLiveMarketDataRoutes(
         if (closed || !response) return;
         const valid = candles.filter((candle) => candle.time >= unresolvedFrom);
         const latest = valid.at(-1)?.time ?? lastCandleTime ?? unresolvedFrom;
-        emit(response, "recovery", {
+        sendNamedEvent("recovery", {
           market: subscription.market,
           symbol: subscription.symbol,
           timeframe: subscription.timeframe,
@@ -184,7 +191,7 @@ export async function registerLiveMarketDataRoutes(
       }
       lastEventAt = event.timestamp;
       lastReceivedAt = event.receivedAt;
-      emit(response, "market-data", event);
+      sendNamedEvent("market-data", event);
       if (!recoveryInFlight) sendHealth("live");
     };
 
