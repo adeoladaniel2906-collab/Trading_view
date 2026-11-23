@@ -6,6 +6,7 @@ import {
   selectActivePanel,
   updatePanelChartType,
   updatePanelIndicator,
+  updatePanelIndicatorParameter,
   updatePanelSelection,
   updateWorkspaceSync,
 } from "../src/features/workspace/workspace-model.js";
@@ -59,6 +60,21 @@ test("indicator settings are isolated to the selected panel", () => {
   assert.equal(changed.panels[0]?.indicators.macd, false);
   assert.equal(changed.panels[1]?.indicators.macd, true);
   assert.throws(() => updatePanelIndicator(workspace, "missing", "rsi", true), /not in the workspace/);
+});
+
+test("indicator parameters are independent per panel and enforce valid ranges", () => {
+  const createId = ids();
+  const workspace = resizeWorkspace(createWorkspaceState(createId), 2, createId);
+  const changed = updatePanelIndicatorParameter(workspace, "panel-2", "rsiPeriod", 21);
+  assert.equal(changed.panels[0]?.indicatorParameters.rsiPeriod, 14);
+  assert.equal(changed.panels[1]?.indicatorParameters.rsiPeriod, 21);
+  const invalidMacd = updatePanelIndicatorParameter(changed, "panel-2", "macdFastPeriod", 26);
+  assert.equal(invalidMacd.panels[1]?.indicatorParameters.macdFastPeriod, 12);
+  const invalidRange = updatePanelIndicatorParameter(changed, "panel-2", "atrPeriod", 501);
+  assert.equal(invalidRange.panels[1]?.indicatorParameters.atrPeriod, 14);
+  assert.throws(() =>
+    updatePanelIndicatorParameter(changed, "missing", "rsiPeriod", 20),
+  /not in the workspace/);
 });
 
 test("invalid layout and active panel IDs are rejected", () => {
