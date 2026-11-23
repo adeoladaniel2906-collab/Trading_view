@@ -84,6 +84,8 @@ export function publishDrawingHistory(
   history: DrawingHistoryState,
   sourcePanelId: string,
 ): void {
+  if (history.drawings.length > 100 ||
+    history.drawings.some((drawing) => !matchesContext(drawing, context))) return;
   const listeners = drawingListeners.get(drawingStorageKey(context));
   if (!listeners) return;
   for (const listener of listeners) listener(history, sourcePanelId);
