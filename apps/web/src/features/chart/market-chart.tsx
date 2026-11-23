@@ -83,6 +83,7 @@ export function MarketChart({
   const priceSeriesRef = useRef<PriceSeries | null>(null);
   const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
   const lastAppliedCrosshairTimeRef = useRef<number | null>(null);
+  const isApplyingCrosshairRef = useRef(false);
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const cancelLabelEditRef = useRef(false);
   const activeKey = contextKey(market, symbol, timeframe);
@@ -311,12 +312,12 @@ export function MarketChart({
     const chart = chartRef.current;
     if (!chart || !syncCrosshair) return;
     const handleCrosshairMove = (event: MouseEventParams<Time>) => {
+      if (isApplyingCrosshairRef.current) return;
       if (typeof event.time !== "number") {
         lastAppliedCrosshairTimeRef.current = null;
         onCrosshairTime(null);
         return;
       }
-      if (event.time === lastAppliedCrosshairTimeRef.current) return;
       lastAppliedCrosshairTimeRef.current = null;
       onCrosshairTime(event.time);
     };
@@ -329,18 +330,26 @@ export function MarketChart({
     const series = priceSeriesRef.current;
     if (!chart || !series) return;
     if (!syncCrosshair || crosshairTime === null) {
-      if (lastAppliedCrosshairTimeRef.current !== null) chart.clearCrosshairPosition();
+      if (lastAppliedCrosshairTimeRef.current !== null) {
+        isApplyingCrosshairRef.current = true;
+        chart.clearCrosshairPosition();
+        isApplyingCrosshairRef.current = false;
+      }
       lastAppliedCrosshairTimeRef.current = null;
       return;
     }
     const target = nearestCrosshairTarget(availableCandles, crosshairTime);
     if (!target) {
+      isApplyingCrosshairRef.current = true;
       chart.clearCrosshairPosition();
+      isApplyingCrosshairRef.current = false;
       lastAppliedCrosshairTimeRef.current = null;
       return;
     }
     if (lastAppliedCrosshairTimeRef.current === target.time) return;
+    isApplyingCrosshairRef.current = true;
     chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
+    isApplyingCrosshairRef.current = false;
     lastAppliedCrosshairTimeRef.current = target.time;
   }, [availableCandles, chartType, crosshairTime, syncCrosshair]);
 
