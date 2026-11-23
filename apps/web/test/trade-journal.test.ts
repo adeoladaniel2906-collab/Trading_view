@@ -110,6 +110,10 @@ test("journal summary separates planned risk, open risk and today's realized P&L
   assert.equal(summary.realizedPnlToday, closed.realizedPnl);
 });
 
+test("journal summary rejects invalid clock values", () => {
+  assert.throws(() => summarizeTradeJournal([], Number.NaN), /timestamp must be finite/);
+});
+
 test("journal storage round-trips valid entries and rejects malformed or future data", () => {
   const storage = new MemoryStorage();
   const entry = makeEntry("trade-storage");
