@@ -108,11 +108,14 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
         close: candle.close,
       })),
     );
+    const indicatorByTime = new Map(candles.map((candle) => [candle.time, candle]));
+    if (liveCandle) indicatorByTime.set(liveCandle.time, liveCandle);
+    const indicatorCandles = [...indicatorByTime.values()].sort((left, right) => left.time - right.time);
     smaSeriesRef.current?.setData(showSma
-      ? simpleMovingAverage(candles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
+      ? simpleMovingAverage(indicatorCandles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
       : []);
     emaSeriesRef.current?.setData(showEma
-      ? exponentialMovingAverage(candles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
+      ? exponentialMovingAverage(indicatorCandles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
       : []);
     const latestLiveCandle = latestLiveCandleRef.current;
     if (latestLiveCandle) {
@@ -128,7 +131,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
     if (candles.length > 0) {
       chartRef.current?.timeScale().fitContent();
     }
-  }, [candles, showSma, showEma]);
+  }, [candles, liveCandle, showSma, showEma]);
 
   useEffect(() => {
     latestLiveCandleRef.current = liveCandle;
