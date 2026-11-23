@@ -86,3 +86,18 @@
     margin-left: 0;
   }
 }
+
+.market-chart-shell.is-compact {
+  min-height: 320px;
+}
+.market-chart-shell.is-compact .market-chart-canvas {
+  height: 320px;
+}
+.market-chart-shell.is-compact .drawing-toolbar {
+  min-height: 40px;
+  padding: 6px 10px;
+}
+.market-chart-shell.is-compact .drawing-hint {
+  flex-basis: 100%;
+  margin-left: 0;
+}
