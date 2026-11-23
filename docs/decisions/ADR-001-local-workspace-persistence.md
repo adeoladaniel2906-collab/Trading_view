@@ -17,10 +17,12 @@ Persist:
 - The bounded 1/2/4-panel workspace and per-panel settings.
 - Supported crypto and Forex watchlists.
 - Drawing records, partitioned by exact market, symbol, and timeframe.
+- A bounded local paper-trade journal containing plans, manual open/close status, notes and realized P&L.
 
 Do not persist:
 - API keys, provider credentials, session tokens, or authentication secrets.
 - Live candles, event streams, or transient pointer/drag state.
+- Broker credentials, order-routing data, or claims of actual fills.
 - Undo/redo history, which remains an in-memory interaction detail.
 
 Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and known v1-to-v2 and v2-to-v3 migrations: v1 adds newly introduced indicator toggles as disabled; v2 adds validated default indicator parameters. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
