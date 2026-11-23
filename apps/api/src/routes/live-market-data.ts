@@ -168,42 +168,54 @@ export async function registerLiveMarketDataRoutes(
       sendNamedEvent("feed-health", makeHealth(subscription, providerId, state, lastEventAt, lastReceivedAt, unresolvedFrom));
     };
 
+    let pendingRecoveryFrom: number | null = null;
     const reconcile = async (unresolvedFrom: number) => {
-      if (!historyProvider || recoveryInFlight || !response || closed) return;
+      if (!historyProvider || !response || closed) return;
+      pendingRecoveryFrom = pendingRecoveryFrom === null
+        ? unresolvedFrom
+        : Math.min(pendingRecoveryFrom, unresolvedFrom);
+      if (recoveryInFlight) return;
+
       recoveryInFlight = true;
-      sendHealth("recovering", unresolvedFrom);
       try {
-        const candles = await getSharedRecovery(
-          [subscription.market, subscription.symbol, subscription.timeframe].join(":"),
-          historyProvider,
-          subscription,
-        );
-        if (closed || !response) return;
-        const validated = candleSeriesSchema.safeParse(candles);
-        if (!validated.success || validated.data.length > 500) {
-          throw new Error("Historical recovery returned invalid candle data");
+        while (pendingRecoveryFrom !== null && !closed && response) {
+          const recoveryFrom = pendingRecoveryFrom;
+          pendingRecoveryFrom = null;
+          sendHealth("recovering", recoveryFrom);
+          try {
+            const candles = await getSharedRecovery(
+              [subscription.market, subscription.symbol, subscription.timeframe].join(":"),
+              historyProvider,
+              subscription,
+            );
+            if (closed || !response) return;
+            const validated = candleSeriesSchema.safeParse(candles);
+            if (!validated.success || validated.data.length > 500) {
+              throw new Error("Historical recovery returned invalid candle data");
+            }
+            const valid = validated.data.filter((candle) => candle.time >= recoveryFrom);
+            const latest = valid.at(-1)?.time ?? lastCandleTime ?? recoveryFrom;
+            // Forex session closures cannot be distinguished from missing intervals without a
+            // provider-backed trading calendar. Keep the feed degraded rather than claiming
+            // completeness that the current implementation cannot prove.
+            const unresolved = subscription.market === "forex" ||
+              !hasContinuousCandleCoverage(validated.data, subscription.timeframe, recoveryFrom, lastCandleTime ?? latest)
+              ? recoveryFrom
+              : null;
+            sendNamedEvent("recovery", {
+              market: subscription.market,
+              symbol: subscription.symbol,
+              timeframe: subscription.timeframe,
+              candles: validated.data,
+              reconciledThrough: latest,
+              unresolvedFrom: unresolved,
+            });
+            if (unresolved === null) sendHealth("live");
+            else sendHealth("degraded", unresolved);
+          } catch {
+            if (!closed && response) sendHealth("degraded", recoveryFrom);
+          }
         }
-        const valid = validated.data.filter((candle) => candle.time >= unresolvedFrom);
-        const latest = valid.at(-1)?.time ?? lastCandleTime ?? unresolvedFrom;
-        // Forex session closures cannot be distinguished from missing intervals without a
-        // provider-backed trading calendar. Keep the feed degraded rather than claiming
-        // completeness that the current implementation cannot prove.
-        const unresolved = subscription.market === "forex" ||
-          !hasContinuousCandleCoverage(validated.data, subscription.timeframe, unresolvedFrom, lastCandleTime ?? latest)
-          ? unresolvedFrom
-          : null;
-        sendNamedEvent("recovery", {
-          market: subscription.market,
-          symbol: subscription.symbol,
-          timeframe: subscription.timeframe,
-          candles: validated.data,
-          reconciledThrough: latest,
-          unresolvedFrom: unresolved,
-        });
-        if (unresolved === null) sendHealth("live");
-        else sendHealth("degraded", unresolved);
-      } catch {
-        if (!closed && response) sendHealth("degraded", unresolvedFrom);
       } finally {
         recoveryInFlight = false;
       }
