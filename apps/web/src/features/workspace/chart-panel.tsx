@@ -176,13 +176,14 @@ export function ChartPanel({
           <fieldset className="chart-panel-indicators">
             <legend>Available indicators</legend>
             {INDICATOR_CATALOG.map((indicator) => (
-              <label key={indicator.id}>
+              <label key={indicator.id} title={indicator.formula}>
                 <input
                   type="checkbox"
+                  aria-label={indicator.label}
                   checked={panel.indicators[indicator.id]}
                   onChange={(event) => onIndicatorChange(indicator.id, event.currentTarget.checked)}
                 />
-                {indicator.id.toUpperCase()}
+                {indicator.label}
               </label>
             ))}
           </fieldset>
