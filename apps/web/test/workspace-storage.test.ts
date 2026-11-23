@@ -113,6 +113,47 @@ test("known version-two snapshots migrate with default indicator parameters", ()
   assert.deepEqual(migrated?.workspace.panels[0]?.indicatorParameters, DEFAULT_INDICATOR_PARAMETERS);
 });
 
+test("known version-three snapshots migrate with preserved numeric settings and default sources", () => {
+  const input = fixture();
+  const savedParameters = updatePanelIndicatorParameter(input.workspace, "panel-2", "rsiPeriod", 21)
+    .panels[1]?.indicatorParameters;
+  assert.ok(savedParameters);
+  const {
+    smaSource: _smaSource,
+    emaSource: _emaSource,
+    wmaSource: _wmaSource,
+    vwmaSource: _vwmaSource,
+    rsiSource: _rsiSource,
+    macdSource: _macdSource,
+    bollingerSource: _bollingerSource,
+    stochasticSource: _stochasticSource,
+    vwapSource: _vwapSource,
+    ...legacyParameters
+  } = savedParameters;
+  const versionThreeWorkspace = {
+    ...input.workspace,
+    panels: input.workspace.panels.map((panel, index) => ({
+      ...panel,
+      indicatorParameters: index === 1 ? legacyParameters : (() => {
+        const {
+          smaSource, emaSource, wmaSource, vwmaSource, rsiSource, macdSource,
+          bollingerSource, stochasticSource, vwapSource, ...legacy
+        } = panel.indicatorParameters;
+        return legacy;
+      })(),
+    })),
+  };
+  const migrated = parsePersistedWorkspace(JSON.stringify({
+    schemaVersion: 3,
+    workspace: versionThreeWorkspace,
+    watchlists: input.watchlists,
+  }));
+  assert.equal(migrated?.schemaVersion, WORKSPACE_STORAGE_VERSION);
+  assert.equal(migrated?.workspace.panels[1]?.indicatorParameters.rsiPeriod, 21);
+  assert.equal(migrated?.workspace.panels[1]?.indicatorParameters.rsiSource, "close");
+  assert.equal(migrated?.workspace.panels[1]?.indicatorParameters.vwapSource, "hlc3");
+});
+
 test("parser rejects invalid panel identity, unsupported symbols and duplicate watchlist entries", () => {
   const input = fixture();
   const base = {
@@ -148,6 +189,17 @@ test("parser rejects invalid panel identity, unsupported symbols and duplicate w
     },
   };
   assert.equal(parsePersistedWorkspace(JSON.stringify(invalidParameters)), null);
+  const invalidSource = {
+    ...base,
+    workspace: {
+      ...input.workspace,
+      panels: input.workspace.panels.map((panel) => ({
+        ...panel,
+        indicatorParameters: { ...panel.indicatorParameters, rsiSource: "unknown" },
+      })),
+    },
+  };
+  assert.equal(parsePersistedWorkspace(JSON.stringify(invalidSource)), null);
   const duplicates = { ...base, watchlists: { crypto: ["BTCUSDT", "BTCUSDT"], forex: ["EURUSD"] } };
   assert.equal(parsePersistedWorkspace(JSON.stringify(duplicates)), null);
 });
