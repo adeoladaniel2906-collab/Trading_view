@@ -222,18 +222,26 @@ export function ChartPanel({
             ))}
           </select>
         </label>
-        <label>
-          <span>Interval</span>
-          <select
-            aria-label={`Timeframe for ${panel.id}`}
-            value={panel.timeframe}
-            onChange={(event) => changeTimeframe(event.currentTarget.value as Timeframe)}
-          >
-            {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
-              <option key={timeframe} value={timeframe}>{timeframe}</option>
-            ))}
-          </select>
-        </label>
+        <div className="chart-timeframe-control">
+          <span>TIMEFRAME</span>
+          <div className="chart-timeframe-buttons" role="group" aria-label={`Quick timeframes for ${panel.id}`}>
+            {(["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const)
+              .filter((timeframe) => SUPPORTED_TIMEFRAMES[panel.market].includes(timeframe))
+              .map((timeframe) => (
+                <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
+                  onClick={() => changeTimeframe(timeframe)}>{timeframe}</button>
+              ))}
+          </div>
+          <label className="chart-timeframe-more">
+            <span className="sr-only">All timeframes</span>
+            <select aria-label={`All timeframes for ${panel.id}`} value={panel.timeframe}
+              onChange={(event) => changeTimeframe(event.currentTarget.value as Timeframe)}>
+              {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
+                <option key={timeframe} value={timeframe}>{timeframe}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <label>
           <span>Chart type</span>
           <select aria-label={`Chart type for ${panel.id}`} value={panel.chartType}
