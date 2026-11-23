@@ -2,13 +2,16 @@ import { timeframeSchema, type LiveMarketName } from "@market/contracts";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
 import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
 import {
+  DEFAULT_INDICATOR_PARAMETERS,
   isSupportedSelection,
+  isValidIndicatorParameters,
+  type IndicatorParameters,
   type WorkspaceLayout,
   type WorkspaceState,
 } from "./workspace-model";
 
 export const WORKSPACE_STORAGE_KEY = "market-workspace.snapshot.v1";
-export const WORKSPACE_STORAGE_VERSION = 2 as const;
+export const WORKSPACE_STORAGE_VERSION = 3 as const;
 export const MAX_WORKSPACE_STORAGE_CHARS = 256_000;
 export const MAX_WATCHLIST_SYMBOLS = 100;
 
@@ -52,7 +55,7 @@ function parseWatchlist(value: unknown, market: LiveMarketName): string[] {
   return symbols;
 }
 
-function parseWorkspace(value: unknown, storedVersion: 1 | 2): WorkspaceState {
+function parseWorkspace(value: unknown, storedVersion: 1 | 2 | 3): WorkspaceState {
   if (!isRecord(value) || !LAYOUTS.has(value.layout as number)) {
     throw new TypeError("Saved workspace layout is invalid");
   }
@@ -95,6 +98,13 @@ function parseWorkspace(value: unknown, storedVersion: 1 | 2): WorkspaceState {
     const indicators = Object.fromEntries(
       INDICATOR_IDS.map((id) => [id, typeof rawIndicators[id] === "boolean" ? rawIndicators[id] : false]),
     ) as Record<IndicatorId, boolean>;
+    let indicatorParameters: IndicatorParameters = DEFAULT_INDICATOR_PARAMETERS;
+    if (storedVersion === 3) {
+      if (!isValidIndicatorParameters(rawPanel.indicatorParameters)) {
+        throw new TypeError("Saved indicator parameters are invalid");
+      }
+      indicatorParameters = rawPanel.indicatorParameters;
+    }
     return {
       id: rawPanel.id,
       market,
@@ -102,6 +112,7 @@ function parseWorkspace(value: unknown, storedVersion: 1 | 2): WorkspaceState {
       timeframe: parsedTimeframe.data,
       chartType: rawPanel.chartType as ChartType,
       indicators,
+      indicatorParameters,
     };
   });
   if (new Set(panels.map((panel) => panel.id)).size !== panels.length) {
@@ -135,9 +146,9 @@ export function parsePersistedWorkspace(serialized: string | null): PersistedWor
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed) ||
-      (parsed.schemaVersion !== 1 && parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION) ||
+      (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2 && parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION) ||
       !isRecord(parsed.watchlists)) return null;
-    const storedVersion = parsed.schemaVersion as 1 | 2;
+    const storedVersion = parsed.schemaVersion as 1 | 2 | 3;
     const workspace = parseWorkspace(parsed.workspace, storedVersion);
     const watchlists = {
       crypto: parseWatchlist(parsed.watchlists.crypto, "crypto"),

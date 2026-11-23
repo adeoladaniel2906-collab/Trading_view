@@ -6,6 +6,7 @@ import {
   SUPPORTED_SYMBOLS,
   SUPPORTED_TIMEFRAMES,
   type ChartPanelState,
+  type IndicatorParameterKey,
   type PanelSelection,
 } from "../workspace/workspace-model";
 import { useMarketData } from "../market-data/use-market-data";
@@ -39,6 +40,7 @@ interface ChartPanelProps {
   readonly onActivate: () => void;
   readonly onSelectionChange: (selection: PanelSelection) => void;
   readonly onIndicatorChange: (indicator: IndicatorId, enabled: boolean) => void;
+  readonly onIndicatorParameterChange: (parameter: IndicatorParameterKey, value: number) => void;
   readonly onChartTypeChange: (chartType: ChartType) => void;
   readonly compact: boolean;
 }
@@ -53,6 +55,7 @@ export function ChartPanel({
   onActivate,
   onSelectionChange,
   onIndicatorChange,
+  onIndicatorParameterChange,
   onChartTypeChange,
   compact,
 }: ChartPanelProps) {
@@ -107,6 +110,26 @@ export function ChartPanel({
   };
   const chartCandles = replay ? visibleReplayCandles(replay) : candles;
   const chartLiveCandle = replay ? null : liveCandle;
+  const renderParameter = (
+    label: string,
+    parameter: IndicatorParameterKey,
+    min: number,
+    max: number,
+    step = 1,
+  ) => (
+    <label key={parameter}>
+      <span>{label}</span>
+      <input
+        type="number"
+        aria-label={`${label} for ${panel.id}`}
+        value={panel.indicatorParameters[parameter]}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(event) => onIndicatorParameterChange(parameter, Number(event.currentTarget.value))}
+      />
+    </label>
+  );
 
   return (
     <section
@@ -173,6 +196,7 @@ export function ChartPanel({
         </label>
         <details className="chart-panel-indicator-menu">
           <summary>Indicators</summary>
+          <div className="chart-panel-indicator-popover">
           <fieldset className="chart-panel-indicators">
             <legend>Available indicators</legend>
             {INDICATOR_CATALOG.map((indicator) => (
@@ -186,6 +210,34 @@ export function ChartPanel({
               </label>
             ))}
           </fieldset>
+          <details className="chart-panel-indicator-parameters">
+            <summary>Parameters</summary>
+            <div className="chart-panel-indicator-parameter-grid">
+              <fieldset>
+                <legend>Moving averages</legend>
+                {renderParameter("SMA period", "smaPeriod", 1, 500)}
+                {renderParameter("EMA period", "emaPeriod", 1, 500)}
+                {renderParameter("WMA period", "wmaPeriod", 1, 500)}
+                {renderParameter("VWMA period", "vwmaPeriod", 1, 500)}
+              </fieldset>
+              <fieldset>
+                <legend>Oscillators</legend>
+                {renderParameter("RSI period", "rsiPeriod", 1, 500)}
+                {renderParameter("MACD fast", "macdFastPeriod", 1, panel.indicatorParameters.macdSlowPeriod - 1)}
+                {renderParameter("MACD slow", "macdSlowPeriod", panel.indicatorParameters.macdFastPeriod + 1, 500)}
+                {renderParameter("MACD signal", "macdSignalPeriod", 1, 50)}
+                {renderParameter("ATR period", "atrPeriod", 1, 500)}
+                {renderParameter("Stochastic period", "stochasticPeriod", 1, 500)}
+                {renderParameter("Stochastic signal", "stochasticSignalPeriod", 1, 50)}
+              </fieldset>
+              <fieldset>
+                <legend>Bollinger Bands</legend>
+                {renderParameter("Band period", "bollingerPeriod", 1, 500)}
+                {renderParameter("Deviation multiplier", "bollingerMultiplier", 0.1, 10, 0.1)}
+              </fieldset>
+            </div>
+          </details>
+          </div>
         </details>
       </div>
 
@@ -241,6 +293,7 @@ export function ChartPanel({
         symbol={panel.symbol}
         chartLabel={displaySymbol(panel.market, panel.symbol)}
         indicators={panel.indicators}
+        indicatorParameters={panel.indicatorParameters}
         chartType={panel.chartType}
         compact={compact}
         emptyMessage={

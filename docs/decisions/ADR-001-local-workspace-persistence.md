@@ -11,7 +11,7 @@ The application must not pretend that browser-local data is cloud-synchronized o
 
 ## Decision
 
-Use versioned browser `localStorage` for the current single-browser workspace state and drawing records. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
+Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, and drawing records. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
 
 Persist:
 - The bounded 1/2/4-panel workspace and per-panel settings.
@@ -23,7 +23,7 @@ Do not persist:
 - Live candles, event streams, or transient pointer/drag state.
 - Undo/redo history, which remains an in-memory interaction detail.
 
-Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and a known v1-to-v2 migration that defaults newly introduced indicator toggles to disabled. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
+Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and known v1-to-v2 and v2-to-v3 migrations: v1 adds newly introduced indicator toggles as disabled; v2 adds validated default indicator parameters. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
 
 ## Alternatives considered
 

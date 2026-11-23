@@ -4,6 +4,68 @@ import type { ChartType } from "../chart/chart-types";
 
 export type WorkspaceLayout = 1 | 2 | 4;
 
+export interface IndicatorParameters {
+  readonly smaPeriod: number;
+  readonly emaPeriod: number;
+  readonly wmaPeriod: number;
+  readonly vwmaPeriod: number;
+  readonly rsiPeriod: number;
+  readonly macdFastPeriod: number;
+  readonly macdSlowPeriod: number;
+  readonly macdSignalPeriod: number;
+  readonly bollingerPeriod: number;
+  readonly bollingerMultiplier: number;
+  readonly atrPeriod: number;
+  readonly stochasticPeriod: number;
+  readonly stochasticSignalPeriod: number;
+}
+
+export type IndicatorParameterKey = keyof IndicatorParameters;
+
+export const DEFAULT_INDICATOR_PARAMETERS: IndicatorParameters = {
+  smaPeriod: 20,
+  emaPeriod: 20,
+  wmaPeriod: 20,
+  vwmaPeriod: 20,
+  rsiPeriod: 14,
+  macdFastPeriod: 12,
+  macdSlowPeriod: 26,
+  macdSignalPeriod: 9,
+  bollingerPeriod: 20,
+  bollingerMultiplier: 2,
+  atrPeriod: 14,
+  stochasticPeriod: 14,
+  stochasticSignalPeriod: 3,
+};
+
+const INDICATOR_PARAMETER_KEYS: readonly IndicatorParameterKey[] = [
+  "smaPeriod", "emaPeriod", "wmaPeriod", "vwmaPeriod", "rsiPeriod",
+  "macdFastPeriod", "macdSlowPeriod", "macdSignalPeriod",
+  "bollingerPeriod", "bollingerMultiplier", "atrPeriod",
+  "stochasticPeriod", "stochasticSignalPeriod",
+];
+
+export function isValidIndicatorParameters(value: unknown): value is IndicatorParameters {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const parameters = value as Record<string, unknown>;
+  if (Object.keys(parameters).length !== INDICATOR_PARAMETER_KEYS.length ||
+    Object.keys(parameters).some((key) => !INDICATOR_PARAMETER_KEYS.includes(key as IndicatorParameterKey))) {
+    return false;
+  }
+  const periodKeys = INDICATOR_PARAMETER_KEYS.filter((key) => key !== "bollingerMultiplier");
+  if (periodKeys.some((key) =>
+    typeof parameters[key] !== "number" ||
+    !Number.isInteger(parameters[key]) ||
+    (parameters[key] as number) < 1 ||
+    (parameters[key] as number) > 500)) return false;
+  const multiplier = parameters.bollingerMultiplier;
+  return typeof multiplier === "number" && Number.isFinite(multiplier) &&
+    multiplier >= 0.1 && multiplier <= 10 &&
+    (parameters.macdFastPeriod as number) < (parameters.macdSlowPeriod as number) &&
+    (parameters.macdSignalPeriod as number) <= 50 &&
+    (parameters.stochasticSignalPeriod as number) <= 50;
+}
+
 export interface ChartPanelState {
   readonly id: string;
   readonly market: LiveMarketName;
@@ -11,6 +73,7 @@ export interface ChartPanelState {
   readonly timeframe: Timeframe;
   readonly chartType: ChartType;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
+  readonly indicatorParameters: IndicatorParameters;
 }
 
 export interface WorkspaceSyncSettings {
@@ -57,6 +120,7 @@ function defaultPanel(id: string): ChartPanelState {
     timeframe: "1m",
     chartType: "candles",
     indicators,
+    indicatorParameters: DEFAULT_INDICATOR_PARAMETERS,
   };
 }
 
@@ -113,6 +177,26 @@ export function updatePanelChartType(
   return {
     ...state,
     panels: state.panels.map((panel) => panel.id === panelId ? { ...panel, chartType } : panel),
+  };
+}
+
+export function updatePanelIndicatorParameter(
+  state: WorkspaceState,
+  panelId: string,
+  parameter: IndicatorParameterKey,
+  value: number,
+): WorkspaceState {
+  const selectedPanel = state.panels.find((panel) => panel.id === panelId);
+  if (!selectedPanel) {
+    throw new RangeError("Cannot update a panel that is not in the workspace");
+  }
+  const indicatorParameters = { ...selectedPanel.indicatorParameters, [parameter]: value };
+  if (!isValidIndicatorParameters(indicatorParameters)) return state;
+  return {
+    ...state,
+    panels: state.panels.map((panel) => panel.id === panelId
+      ? { ...panel, indicatorParameters }
+      : panel),
   };
 }
 
