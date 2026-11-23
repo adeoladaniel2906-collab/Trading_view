@@ -292,3 +292,5 @@
  .drawing-option, .drawing-option select { width:36px; max-width:36px; }
  .market-chart-stage, .market-chart-canvas { min-height:320px; }
 }
+
+.drawing-hint { position:absolute; left:10px; bottom:8px; z-index:3; max-width:calc(100% - 20px); padding:4px 7px; border:1px solid #263342; border-radius:4px; background:rgb(14 21 29 / 88%); color:#94a0b1; font-size:9px; pointer-events:none; }
