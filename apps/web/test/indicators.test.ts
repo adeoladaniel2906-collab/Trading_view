@@ -6,9 +6,13 @@ import {
   bollingerBands,
   exponentialMovingAverage,
   movingAverageConvergenceDivergence,
+  onBalanceVolume,
   relativeStrengthIndex,
   simpleMovingAverage,
+  stochasticOscillator,
   volumeWeightedAveragePrice,
+  volumeWeightedMovingAverage,
+  weightedMovingAverage,
 } from "../src/features/chart/indicators.js";
 
 const candles = [
@@ -20,16 +24,37 @@ const candles = [
 
 test("SMA returns rolling averages aligned to candle timestamps", () => {
   assert.deepEqual(simpleMovingAverage(candles, 3), [
-    { time: 180, value: 2 },
-    { time: 240, value: 3 },
+    { time: 180, value: 2 }, { time: 240, value: 3 },
   ]);
 });
 
 test("EMA seeds with an SMA then applies the standard smoothing multiplier", () => {
   assert.deepEqual(exponentialMovingAverage(candles, 3), [
-    { time: 180, value: 2 },
-    { time: 240, value: 3 },
+    { time: 180, value: 2 }, { time: 240, value: 3 },
   ]);
+});
+
+test("WMA weights the newest close most heavily", () => {
+  const result = weightedMovingAverage(candles, 3);
+  assert.deepEqual(result, [
+    { time: 180, value: 14 / 6 },
+    { time: 240, value: 20 / 6 },
+  ]);
+});
+
+test("VWMA requires complete non-negative volume and weights close by volume", () => {
+  const values = [
+    { time: 60, open: 10, high: 10, low: 10, close: 10, volume: 1 },
+    { time: 120, open: 20, high: 20, low: 20, close: 20, volume: 2 },
+    { time: 180, open: 30, high: 30, low: 30, close: 30, volume: 3 },
+    { time: 240, open: 40, high: 40, low: 40, close: 40, volume: 1 },
+  ];
+  const result = volumeWeightedMovingAverage(values, 3);
+  assert.deepEqual(result, [
+    { time: 180, value: 140 / 6 },
+    { time: 240, value: 170 / 6 },
+  ]);
+  assert.deepEqual(volumeWeightedMovingAverage(candles, 2), []);
 });
 
 test("RSI uses Wilder smoothing and handles rising, falling and flat markets", () => {
@@ -59,6 +84,34 @@ test("Bollinger Bands use population standard deviation", () => {
   assert.ok(Math.abs((result[0]?.lower ?? 0) - (2 - 2 * Math.sqrt(2 / 3))) < 1e-12);
 });
 
+test("Stochastic oscillator aligns %K and %D after their respective warm-up periods", () => {
+  const values = [
+    { time: 60, open: 2, high: 3, low: 1, close: 2 },
+    { time: 120, open: 3, high: 4, low: 2, close: 3 },
+    { time: 180, open: 4, high: 5, low: 3, close: 4 },
+    { time: 240, open: 3, high: 4, low: 2, close: 3 },
+    { time: 300, open: 5, high: 6, low: 2, close: 5 },
+  ];
+  const result = stochasticOscillator(values, 3, 2);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map((point) => point.k), [100 / 3, 75]);
+  assert.ok(result.every((point) => Math.abs(point.d - 325 / 6) < 1e-12));
+});
+
+test("OBV is cumulative and requires complete provider volume", () => {
+  const values = [
+    { time: 60, open: 10, high: 10, low: 10, close: 10, volume: 5 },
+    { time: 120, open: 12, high: 12, low: 12, close: 12, volume: 3 },
+    { time: 180, open: 11, high: 11, low: 11, close: 11, volume: 2 },
+    { time: 240, open: 11, high: 11, low: 11, close: 11, volume: 7 },
+  ];
+  assert.deepEqual(onBalanceVolume(values), [
+    { time: 60, value: 0 }, { time: 120, value: 3 },
+    { time: 180, value: 1 }, { time: 240, value: 1 },
+  ]);
+  assert.deepEqual(onBalanceVolume(candles), []);
+});
+
 test("ATR uses true range including gaps from the previous close", () => {
   const values = [
     { time: 60, open: 9, high: 10, low: 8, close: 9 },
@@ -66,8 +119,7 @@ test("ATR uses true range including gaps from the previous close", () => {
     { time: 180, open: 12, high: 13, low: 10, close: 12 },
   ];
   assert.deepEqual(averageTrueRange(values, 2), [
-    { time: 120, value: 2.5 },
-    { time: 180, value: 2.75 },
+    { time: 120, value: 2.5 }, { time: 180, value: 2.75 },
   ]);
 });
 
@@ -79,24 +131,28 @@ test("VWAP resets at UTC day boundaries and requires real provider volume", () =
     { time: 86_520, open: 39, high: 42, low: 36, close: 39 },
   ];
   assert.deepEqual(volumeWeightedAveragePrice(values), [
-    { time: 86_399, value: 9 },
-    { time: 86_400, value: 19 },
+    { time: 86_399, value: 9 }, { time: 86_400, value: 19 },
     { time: 86_460, value: 26.5 },
   ]);
   assert.deepEqual(volumeWeightedAveragePrice(candles), []);
 });
 
-test("indicator catalogue declares overlay and oscillator families", () => {
+test("indicator catalogue declares the implemented overlay and oscillator families", () => {
   assert.deepEqual(INDICATOR_CATALOG.map((item) => item.id), [
-    "sma", "ema", "bollinger", "vwap", "rsi", "macd", "atr",
+    "sma", "ema", "wma", "vwma", "bollinger", "vwap",
+    "rsi", "macd", "stochastic", "atr", "obv",
   ]);
   assert.equal(INDICATOR_CATALOG.find((item) => item.id === "rsi")?.pane, "oscillator");
+  assert.ok(INDICATOR_CATALOG.every((item) => item.formula.length > 10));
 });
 
 test("indicators reject invalid periods and band multipliers", () => {
   assert.throws(() => simpleMovingAverage(candles, 0), RangeError);
   assert.throws(() => exponentialMovingAverage(candles, 1.5), RangeError);
+  assert.throws(() => weightedMovingAverage(candles, 0), RangeError);
+  assert.throws(() => volumeWeightedMovingAverage(candles, -1), RangeError);
   assert.throws(() => relativeStrengthIndex(candles, 0), RangeError);
+  assert.throws(() => stochasticOscillator(candles, 0), RangeError);
   assert.throws(() => averageTrueRange(candles, -1), RangeError);
   assert.throws(() => bollingerBands(candles, 2, 0), RangeError);
 });
