@@ -35,20 +35,33 @@ export async function registerLiveMarketDataRoutes(
     };
 
     let response: typeof reply.raw | undefined;
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+    let unsubscribe: (() => void) | undefined;
     let closed = false;
     const pending: LiveMarketEvent[] = [];
-    let unsubscribe: (() => void);
+
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      if (heartbeat) clearInterval(heartbeat);
+      unsubscribe?.();
+    };
+
+    const sendEvent = (event: LiveMarketEvent) => {
+      if (closed) return;
+      const frame = "event: market-data\ndata: " + JSON.stringify(event) + "\n\n";
+      if (!response) {
+        if (pending.length < 20) pending.push(event);
+        return;
+      }
+      if (!response.destroyed && !response.write(frame)) {
+        cleanup();
+        response.end();
+      }
+    };
+
     try {
-      unsubscribe = hub.subscribe(subscription, request.ip, (event) => {
-        if (closed) return;
-        if (!response) {
-          if (pending.length < 20) pending.push(event);
-          return;
-        }
-        if (!response.destroyed) {
-          response.write("event: market-data\ndata: " + JSON.stringify(event) + "\n\n");
-        }
-      });
+      unsubscribe = hub.subscribe(subscription, request.ip, sendEvent);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "subscription rejected";
       const limited = /limit|capacity/i.test(reason);
@@ -70,25 +83,22 @@ export async function registerLiveMarketDataRoutes(
       "X-Accel-Buffering": "no",
     });
     response.write("event: ready\ndata: {\"status\":\"connected\"}\n\n");
-    for (const event of pending) {
-      response.write("event: market-data\ndata: " + JSON.stringify(event) + "\n\n");
-    }
-    pending.length = 0;
-
-    const cleanup = () => {
-      if (closed) return;
-      closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
-    };
-    const heartbeat = setInterval(() => {
-      if (!response?.destroyed) response?.write(": keep-alive\n\n");
-      else cleanup();
+    heartbeat = setInterval(() => {
+      if (response?.destroyed) {
+        cleanup();
+        return;
+      }
+      if (response && !response.write(": keep-alive\n\n")) {
+        cleanup();
+        response.end();
+      }
     }, 15_000);
     heartbeat.unref?.();
 
     response.on("close", cleanup);
     request.raw.on("aborted", cleanup);
+    for (const event of pending) sendEvent(event);
+    pending.length = 0;
     return reply;
   });
 }
