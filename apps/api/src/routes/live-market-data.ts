@@ -268,6 +268,7 @@ export async function registerLiveMarketDataRoutes(
       ) {
         staleReported = true;
         sendHealth("stale");
+        if (lastCandleTime !== null) void reconcile(lastCandleTime);
       }
       if (response && !response.write(": keep-alive\n\n")) {
         cleanup();
