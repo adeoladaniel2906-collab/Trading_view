@@ -23,6 +23,7 @@ export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: Ma
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const latestLiveCandleRef = useRef<Candle | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -81,6 +82,16 @@ export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: Ma
         close: candle.close,
       })),
     );
+    const latestLiveCandle = latestLiveCandleRef.current;
+    if (latestLiveCandle) {
+      series.update({
+        time: latestLiveCandle.time as UTCTimestamp as Time,
+        open: latestLiveCandle.open,
+        high: latestLiveCandle.high,
+        low: latestLiveCandle.low,
+        close: latestLiveCandle.close,
+      });
+    }
 
     if (candles.length > 0) {
       chartRef.current?.timeScale().fitContent();
@@ -88,6 +99,7 @@ export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: Ma
   }, [candles]);
 
   useEffect(() => {
+    latestLiveCandleRef.current = liveCandle;
     if (!liveCandle) return;
     seriesRef.current?.update({
       time: liveCandle.time as UTCTimestamp as Time,
