@@ -56,3 +56,35 @@ export function saveDrawingHistory(
     return false;
   }
 }
+
+
+export type DrawingHistoryListener = (
+  history: DrawingHistoryState,
+  sourcePanelId: string,
+) => void;
+
+const drawingListeners = new Map<string, Set<DrawingHistoryListener>>();
+
+export function subscribeDrawingHistory(
+  context: DrawingContext,
+  listener: DrawingHistoryListener,
+): () => void {
+  const key = drawingStorageKey(context);
+  const listeners = drawingListeners.get(key) ?? new Set<DrawingHistoryListener>();
+  listeners.add(listener);
+  drawingListeners.set(key, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) drawingListeners.delete(key);
+  };
+}
+
+export function publishDrawingHistory(
+  context: DrawingContext,
+  history: DrawingHistoryState,
+  sourcePanelId: string,
+): void {
+  const listeners = drawingListeners.get(drawingStorageKey(context));
+  if (!listeners) return;
+  for (const listener of listeners) listener(history, sourcePanelId);
+}
