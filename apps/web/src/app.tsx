@@ -1,3 +1,8 @@
+import type { Candle } from "@market/contracts";
+import { MarketChart } from "./features/chart/market-chart";
+
+const EMPTY_CANDLES: readonly Candle[] = [];
+
 export function App() {
   return (
     <main className="workspace">
@@ -6,44 +11,44 @@ export function App() {
           <span className="brand-mark" aria-hidden="true">M</span>
           <span>Market Workspace</span>
         </a>
-        <span className="environment-label">Foundation preview</span>
+        <span className="environment-label">Chart engine preview</span>
       </header>
       <section className="intro" aria-labelledby="page-title">
         <p className="eyebrow">Independent market analysis</p>
-        <h1 id="page-title">Your market workspace starts here.</h1>
+        <h1 id="page-title">A clearer view of the markets.</h1>
         <p className="intro-copy">
-          The application foundation is in place. Charting, verified market data, and analysis
-          tools will be added as separate, testable modules.
+          The charting engine is integrated. Market prices will appear only after a verified
+          market-data provider is configured and its data passes validation.
         </p>
       </section>
       <section className="workspace-panel" aria-labelledby="chart-title">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">Chart engine not connected</h2>
+            <h2 id="chart-title">Market chart</h2>
           </div>
           <span className="status-pill">
             <span className="status-dot" aria-hidden="true" />
-            Awaiting market data
+            Datafeed not configured
           </span>
         </div>
-        <div className="chart-placeholder" role="status">
-          <div className="placeholder-icon" aria-hidden="true">
-            <svg viewBox="0 0 48 48" fill="none">
-              <title>Chart icon</title>
-              <path d="M7 37.5h34M11 31V18m9 13V10m9 21V22m9 9V14" />
-              <path d="M7 9.5h34" />
-            </svg>
-          </div>
-          <p className="placeholder-title">No chart data loaded</p>
-          <p className="placeholder-copy">
-            No prices are being simulated or presented as live market information.
-          </p>
+        <div className="chart-toolbar">
+          <span className="chart-symbol">No instrument selected</span>
+          <span className="chart-timeframe">Timeframe controls unlock when market data is available</span>
         </div>
+        <MarketChart
+          candles={EMPTY_CANDLES}
+          emptyMessage="No market-data provider is connected. No prices are simulated or displayed as live data."
+        />
       </section>
       <footer className="footer">
-        <span>Built for transparent, data-driven analysis.</span>
-        <span>Early foundation · No trading execution</span>
+        <span>Independent market analysis · No trading execution</span>
+        <span>
+          Charting by{" "}
+          <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
+            TradingView Lightweight Charts™
+          </a>
+        </span>
       </footer>
     </main>
   );
