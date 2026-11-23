@@ -86,7 +86,7 @@ const liveMarketBaseSchema = z.object({
 export const liveMarketEventSchema = z.union([
   liveMarketBaseSchema.extend({
     kind: z.literal("candle"),
-    market: z.literal("crypto"),
+    market: z.enum(["crypto", "forex"]),
     timeframe: timeframeSchema,
     candle: candleSchema,
     closed: z.boolean(),
