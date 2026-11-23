@@ -7,6 +7,7 @@ import {
   exponentialMovingAverage,
   movingAverageConvergenceDivergence,
   onBalanceVolume,
+  priceFromCandle,
   relativeStrengthIndex,
   simpleMovingAverage,
   stochasticOscillator,
@@ -27,6 +28,18 @@ test("SMA returns rolling averages aligned to candle timestamps", () => {
     { time: 180, value: 2 },
     { time: 240, value: 3 },
   ]);
+});
+
+test("OHLC-derived price sources use their exact documented averages", () => {
+  const candle = { time: 60, open: 1, high: 9, low: 3, close: 7 };
+  assert.equal(priceFromCandle(candle, "open"), 1);
+  assert.equal(priceFromCandle(candle, "high"), 9);
+  assert.equal(priceFromCandle(candle, "low"), 3);
+  assert.equal(priceFromCandle(candle, "close"), 7);
+  assert.equal(priceFromCandle(candle, "hl2"), 6);
+  assert.ok(Math.abs(priceFromCandle(candle, "hlc3") - 19 / 3) < 1e-12);
+  assert.equal(priceFromCandle(candle, "ohlc4"), 5);
+  assert.equal(priceFromCandle(candle, "hlcc4"), 6.5);
 });
 
 test("source-based indicators use the selected OHLC-derived price series", () => {
