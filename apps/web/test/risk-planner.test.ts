@@ -81,6 +81,19 @@ test("rejects invalid side, risk, fee, and instrument sizing inputs", () => {
   assert.throws(() => calculateRiskPlan({ ...baseInput, pointValue: 0 }), /Point value/);
 });
 
+test("rejects quantity steps whose integer count cannot be represented safely", () => {
+  assert.throws(() => calculateRiskPlan({
+    ...baseInput,
+    accountEquity: 1e100,
+    entryPrice: 10,
+    stopPrice: 9.99,
+    targetPrice: 10.02,
+    quantityStep: 1e-100,
+    minimumQuantity: 1e-100,
+    roundTripFeeRate: 0,
+  }), /too small for reliable numeric sizing/);
+});
+
 test("rejects plans below the minimum quantity", () => {
   assert.throws(
     () => calculateRiskPlan({ ...baseInput, accountEquity: 1, riskPercent: 0.1 }),
