@@ -7,6 +7,7 @@ import {
   createDrawingHistory,
   distanceToSegment,
   redoDrawing,
+  snapDrawingAnchor,
   undoDrawing,
   validateDrawing,
   type ChartDrawing,
@@ -159,6 +160,18 @@ test("new mutations clear redo history and undo history is bounded", () => {
     });
   }
   assert.equal(state.undoStack.length, MAX_DRAWING_HISTORY);
+});
+
+test("magnet snapping uses nearest candle time and real OHLC values", () => {
+  const candles = [
+    { time: 60, open: 10, high: 12, low: 9, close: 11 },
+    { time: 120, open: 11, high: 14, low: 10, close: 13 },
+  ];
+  const anchor = { time: 111, price: 13.7 };
+  assert.deepEqual(snapDrawingAnchor(anchor, candles, "off"), anchor);
+  assert.deepEqual(snapDrawingAnchor(anchor, candles, "weak"), { time: 120, price: 13.7 });
+  assert.deepEqual(snapDrawingAnchor(anchor, candles, "strong"), { time: 120, price: 14 });
+  assert.deepEqual(snapDrawingAnchor(anchor, [], "strong"), anchor);
 });
 
 test("distance-to-segment supports hit testing including degenerate segments", () => {
