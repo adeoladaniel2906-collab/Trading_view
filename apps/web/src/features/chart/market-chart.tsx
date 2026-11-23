@@ -1,12 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   LineSeries,
+  LineStyle,
   ColorType,
   CrosshairMode,
   createChart,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -30,7 +32,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const latestLiveCandleRef = useRef<Candle | null>(null);
+  const latestLiveCandleRef = useRef<Candle | null>(null);\n  const levelLinesRef = useRef<IPriceLine[]>([]);\n  const redoLevelsRef = useRef<number[]>([]);\n  const [levelCount, setLevelCount] = useState(0);\n  const [redoCount, setRedoCount] = useState(0);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -91,7 +93,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
       smaSeriesRef.current = null;
       emaSeriesRef.current = null;
       chartRef.current = null;
-      chart.remove();
+      levelLinesRef.current = [];\n      redoLevelsRef.current = [];\n      setLevelCount(0);\n      setRedoCount(0);\n      chart.remove();
     };
   }, [timeframe]);
 
