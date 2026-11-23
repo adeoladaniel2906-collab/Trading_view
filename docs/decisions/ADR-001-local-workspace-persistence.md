@@ -11,17 +11,19 @@ The application must not pretend that browser-local data is cloud-synchronized o
 
 ## Decision
 
-Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, and drawing records. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
+Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, drawing records, and a separate bounded manual paper-trade journal. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
 
 Persist:
 - The bounded 1/2/4-panel workspace and per-panel settings.
 - Supported crypto and Forex watchlists.
 - Drawing records, partitioned by exact market, symbol, and timeframe.
+- Manual paper-journal entries with bounded notes and planned/open/closed/cancelled states, stored under a separate versioned key.
 
 Do not persist:
 - API keys, provider credentials, session tokens, or authentication secrets.
 - Live candles, event streams, or transient pointer/drag state.
 - Undo/redo history, which remains an in-memory interaction detail.
+- Broker credentials, order-routing data, or claims of actual fills.
 
 Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and known v1-to-v2, v2-to-v3, and v3-to-v4 migrations: v1 adds newly introduced indicator toggles as disabled; v2 adds validated default indicator parameters; v3 preserves numeric indicator settings and adds validated per-indicator price-source defaults. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
 
