@@ -1,4 +1,4 @@
-import WebSocket from "ws";
+import WebSocket, { type RawData } from "ws";
 import type { LiveMarketEvent, LiveMarketRequest, Timeframe } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
 
@@ -38,7 +38,7 @@ function numeric(value: unknown): number | undefined {
     : parsed;
 }
 
-function parseKlineMessage(raw: WebSocket.RawData): {
+function parseKlineMessage(raw: RawData): {
   stream: string;
   event: LiveMarketEvent;
 } | undefined {
@@ -174,7 +174,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
     });
   }
 
-  private handleMessage(data: WebSocket.RawData): void {
+  private handleMessage(data: RawData): void {
     const parsed = parseKlineMessage(data);
     if (!parsed) return;
     const listeners = this.streams.get(parsed.stream);
