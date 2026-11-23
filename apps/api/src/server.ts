@@ -1,13 +1,24 @@
 import { loadConfig } from "./config/env.js";
 import { buildApp } from "./app.js";
+import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
 
 async function start(): Promise<void> {
   const config = loadConfig();
-  const app = await buildApp(config);
+  const marketDataProvider =
+    config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
+      ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
+      : undefined;
+  const app = await buildApp(
+    config,
+    marketDataProvider ? { marketDataProvider } : {},
+  );
 
   try {
     const address = await app.listen({ host: config.HOST, port: config.PORT });
-    app.log.info({ address }, "Market API listening");
+    app.log.info(
+      { address, marketDataProvider: marketDataProvider?.id ?? "disabled" },
+      "Market API listening",
+    );
   } catch (error) {
     app.log.error({ err: error }, "API startup failed");
     await app.close();
@@ -24,14 +35,13 @@ async function start(): Promise<void> {
       process.exitCode = 1;
     }
   };
-
   process.once("SIGINT", () => void shutdown("SIGINT"));
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
 start().catch((error: unknown) => {
   process.stderr.write(
-    `Fatal startup error: ${error instanceof Error ? error.message : "Unknown error"}\n`,
+    "Fatal startup error: " + (error instanceof Error ? error.message : "Unknown error") + "\n",
   );
   process.exitCode = 1;
 });

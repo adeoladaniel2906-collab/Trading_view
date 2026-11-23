@@ -6,7 +6,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { MarketDataProvider } from "../market-data/provider.js";
 
-const symbolPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,31}$/;
+const symbolPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,31}(?:\/[A-Za-z0-9][A-Za-z0-9._:-]{0,15})?$/;
 
 export async function registerMarketDataRoutes(
   app: FastifyInstance,

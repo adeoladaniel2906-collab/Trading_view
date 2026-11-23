@@ -10,6 +10,7 @@ const config: AppConfig = {
   HOST: "127.0.0.1",
   PORT: 3000,
   WEB_ORIGINS: ["http://localhost:5173"],
+  TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED: false,
 };
 
 const validCandles: Candle[] = [
