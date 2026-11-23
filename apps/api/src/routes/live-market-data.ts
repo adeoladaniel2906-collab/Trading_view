@@ -1,13 +1,87 @@
-import { timeframeSchema, type LiveMarketEvent, type LiveMarketRequest } from "@market/contracts";
+import {
+  feedHealthSchema,
+  timeframeSchema,
+  type Candle,
+  type FeedHealth,
+  type LiveMarketEvent,
+  type LiveMarketRequest,
+  type Timeframe,
+} from "@market/contracts";
 import type { FastifyInstance } from "fastify";
+import type { MarketDataProvider } from "../market-data/provider.js";
 import type { LiveMarketDataHub } from "../market-data/live/hub.js";
 
 const symbolPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,15}(?:\/[A-Za-z0-9][A-Za-z0-9._:-]{0,15})?$/;
 const marketSet = new Set(["crypto", "forex"]);
+const recoveryFlights = new Map<string, Promise<readonly Candle[]>>();
+
+const intervalSeconds: Partial<Record<Timeframe, number>> = {
+  "1s": 1, "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1_800,
+  "1h": 3_600, "2h": 7_200, "4h": 14_400, "6h": 21_600, "8h": 28_800,
+  "12h": 43_200, "1d": 86_400, "3d": 259_200, "1w": 604_800,
+};
+
+function candleInterval(timeframe: Timeframe, candleTime: number): number | undefined {
+  if (timeframe !== "1M") return intervalSeconds[timeframe];
+  const date = new Date(candleTime * 1000);
+  const next = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+  return Math.floor(next / 1000) - candleTime;
+}
+
+function emit(response: typeof import("node:http").ServerResponse.prototype, name: string, data: unknown): boolean {
+  if (response.destroyed) return false;
+  return response.write("event: " + name + "\ndata: " + JSON.stringify(data) + "\n\n");
+}
+
+function makeHealth(
+  request: LiveMarketRequest,
+  provider: string,
+  state: FeedHealth["state"],
+  lastEventAt: number | null,
+  lastReceivedAt: number | null,
+  unresolvedFrom: number | null,
+): FeedHealth {
+  const messageCode: FeedHealth["messageCode"] = {
+    connecting: "CONNECTING",
+    live: "HEALTHY",
+    stale: "STALE_FEED",
+    recovering: "BACKFILLING",
+    degraded: unresolvedFrom ? "GAP_UNRESOLVED" : "RECOVERY_FAILED",
+  }[state];
+  return feedHealthSchema.parse({
+    ...request,
+    provider,
+    state,
+    lastEventAt,
+    lastReceivedAt,
+    unresolvedFrom,
+    messageCode,
+  });
+}
+
+async function getSharedRecovery(
+  key: string,
+  provider: MarketDataProvider,
+  request: LiveMarketRequest,
+): Promise<readonly Candle[]> {
+  const existing = recoveryFlights.get(key);
+  if (existing) return existing;
+  const recovery = provider.getCandles(
+    { symbol: request.symbol, timeframe: request.timeframe, limit: 500 },
+    AbortSignal.timeout(8_000),
+  );
+  recoveryFlights.set(key, recovery);
+  try {
+    return await recovery;
+  } finally {
+    if (recoveryFlights.get(key) === recovery) recoveryFlights.delete(key);
+  }
+}
 
 export async function registerLiveMarketDataRoutes(
   app: FastifyInstance,
   hub?: LiveMarketDataHub,
+  providers: Partial<Record<LiveMarketRequest["market"], MarketDataProvider>> = {},
 ): Promise<void> {
   app.get<{
     Params: { market: string; symbol: string };
@@ -33,11 +107,21 @@ export async function registerLiveMarketDataRoutes(
       symbol,
       timeframe: timeframeResult.data,
     };
+    const historyProvider = providers[subscription.market];
+    if (historyProvider?.supportsTimeframe && !historyProvider.supportsTimeframe(subscription.timeframe)) {
+      return reply.code(422).send({
+        error: { code: "TIMEFRAME_UNSUPPORTED", message: "The selected provider does not support this timeframe." },
+      });
+    }
 
     let response: typeof reply.raw | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let unsubscribe: (() => void) | undefined;
     let closed = false;
+    let lastEventAt: number | null = null;
+    let lastReceivedAt: number | null = null;
+    let lastCandleTime: number | null = null;
+    let recoveryInFlight = false;
     const pending: LiveMarketEvent[] = [];
 
     const cleanup = () => {
@@ -47,17 +131,60 @@ export async function registerLiveMarketDataRoutes(
       unsubscribe?.();
     };
 
+    const sendHealth = (state: FeedHealth["state"], unresolvedFrom: number | null = null) => {
+      if (!response) return;
+      const providerId = subscription.market === "crypto" ? "binance" : "twelve-data";
+      emit(response, "feed-health", makeHealth(subscription, providerId, state, lastEventAt, lastReceivedAt, unresolvedFrom));
+    };
+
+    const reconcile = async (unresolvedFrom: number) => {
+      if (!historyProvider || recoveryInFlight || !response || closed) return;
+      recoveryInFlight = true;
+      sendHealth("recovering", unresolvedFrom);
+      try {
+        const candles = await getSharedRecovery(
+          [subscription.market, subscription.symbol, subscription.timeframe].join(":"),
+          historyProvider,
+          subscription,
+        );
+        if (closed || !response) return;
+        const valid = candles.filter((candle) => candle.time >= unresolvedFrom);
+        const latest = valid.at(-1)?.time ?? lastCandleTime ?? unresolvedFrom;
+        emit(response, "recovery", {
+          market: subscription.market,
+          symbol: subscription.symbol,
+          timeframe: subscription.timeframe,
+          candles,
+          reconciledThrough: latest,
+          unresolvedFrom: null,
+        });
+        sendHealth("live");
+      } catch {
+        if (!closed && response) sendHealth("degraded", unresolvedFrom);
+      } finally {
+        recoveryInFlight = false;
+      }
+    };
+
     const sendEvent = (event: LiveMarketEvent) => {
       if (closed) return;
-      const frame = "event: market-data\ndata: " + JSON.stringify(event) + "\n\n";
       if (!response) {
         if (pending.length < 20) pending.push(event);
         return;
       }
-      if (!response.destroyed && !response.write(frame)) {
-        cleanup();
-        response.end();
+      if (event.kind === "candle") {
+        const previousTime = lastCandleTime;
+        const currentTime = event.candle.time;
+        const interval = candleInterval(subscription.timeframe, previousTime ?? currentTime);
+        if (previousTime !== null && interval && currentTime > previousTime + interval) {
+          void reconcile(previousTime + interval);
+        }
+        if (lastCandleTime === null || currentTime >= lastCandleTime) lastCandleTime = currentTime;
       }
+      lastEventAt = event.timestamp;
+      lastReceivedAt = event.receivedAt;
+      emit(response, "market-data", event);
+      sendHealth("live");
     };
 
     try {
@@ -83,6 +210,7 @@ export async function registerLiveMarketDataRoutes(
       "X-Accel-Buffering": "no",
     });
     response.write("event: ready\ndata: {\"status\":\"connected\"}\n\n");
+    sendHealth("connecting");
     heartbeat = setInterval(() => {
       if (response?.destroyed) {
         cleanup();
