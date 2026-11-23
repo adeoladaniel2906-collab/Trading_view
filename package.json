@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.0.0",
   "engines": { "node": ">=24.0.0" },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {
     "dev": "pnpm --filter @market/contracts build && pnpm --parallel --filter @market/web --filter @market/api dev",
     "build": "pnpm --filter @market/contracts build && pnpm --filter @market/api build && pnpm --filter @market/web build",
