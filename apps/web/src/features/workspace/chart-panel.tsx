@@ -47,6 +47,7 @@ interface ChartPanelProps {
   readonly onChartTypeChange: (chartType: ChartType) => void;
   readonly compact: boolean;
   readonly syncCrosshair: boolean;
+  readonly syncDrawings: boolean;
   readonly crosshairTime: number | null;
   readonly onCrosshairTime: (panelId: string, time: number | null) => void;
   readonly indicatorTemplates: readonly IndicatorTemplate[];
@@ -71,6 +72,7 @@ export function ChartPanel({
   onChartTypeChange,
   compact,
   syncCrosshair,
+  syncDrawings,
   crosshairTime,
   onCrosshairTime,
   indicatorTemplates,
@@ -405,7 +407,9 @@ export function ChartPanel({
         indicators={panel.indicators}
         indicatorParameters={panel.indicatorParameters}
         chartType={panel.chartType}
+        panelId={panel.id}
         syncCrosshair={syncCrosshair}
+        syncDrawings={syncDrawings}
         crosshairTime={crosshairTime}
         onCrosshairTime={handleCrosshairTime}
         compact={compact}
