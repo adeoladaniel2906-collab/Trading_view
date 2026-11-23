@@ -78,7 +78,7 @@ export function MarketChart({
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const cancelLabelEditRef = useRef(false);
   const activeKey = contextKey(market, symbol, timeframe);
-  const drawingContext = { market, symbol, timeframe };
+  const drawingContext = useMemo(() => ({ market, symbol, timeframe }), [market, symbol, timeframe]);
   const [history, setHistory] = useState<DrawingHistoryState>(() =>
     loadDrawingHistory(drawingContext, getBrowserStorage()));
   const [historyContextKey, setHistoryContextKey] = useState(activeKey);
@@ -114,14 +114,14 @@ export function MarketChart({
     setDragState(null);
     setDragPreview(null);
     setEditingId(null);
-  }, [activeKey, market, symbol, timeframe]);
+  }, [activeKey, drawingContext]);
 
   useEffect(() => {
     if (historyContextKey !== activeKey ||
       (history.drawings.length === 0 && dirtyContextKey !== activeKey)) return;
     const saved = saveDrawingHistory(drawingContext, history.drawings, getBrowserStorage());
     setDrawingStorageStatus(saved ? "saved" : "unavailable");
-  }, [activeKey, dirtyContextKey, history, historyContextKey, market, symbol, timeframe]);
+  }, [activeKey, dirtyContextKey, history, historyContextKey, drawingContext]);
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
     setDirtyContextKey(activeKey);
