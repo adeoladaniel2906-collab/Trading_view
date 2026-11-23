@@ -68,6 +68,7 @@ export function ChartPanel({
       className={active ? "chart-panel is-active" : "chart-panel"}
       aria-label={`Chart panel ${panel.id}`}
       onPointerDown={onActivate}
+      onFocusCapture={onActivate}
     >
       <header className="chart-panel-heading">
         <div className="chart-panel-instrument">
