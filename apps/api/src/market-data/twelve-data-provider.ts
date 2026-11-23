@@ -103,6 +103,10 @@ export class TwelveDataProvider implements MarketDataProvider {
     this.fetchImpl = fetchImpl;
   }
 
+  supportsTimeframe(timeframe: Timeframe): boolean {
+    return intervalByTimeframe[timeframe] !== undefined;
+  }
+
   async getCandles(request: CandleRequest, signal: AbortSignal): Promise<readonly Candle[]> {
     const interval = intervalByTimeframe[request.timeframe];
     if (!interval) throw new Error("Twelve Data does not support this timeframe for Forex");
