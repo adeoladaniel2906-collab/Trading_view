@@ -1,4 +1,4 @@
-import type { LiveMarketEvent, LiveMarketRequest } from "@market/contracts";
+import { liveMarketEventSchema, type LiveMarketEvent, type LiveMarketRequest } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
 
 interface Channel {
@@ -47,6 +47,8 @@ export class LiveMarketDataHub {
     if (!channel) {
       const listeners = new Set<LiveMarketListener>();
       const unsubscribe = provider.subscribe(request, (event: LiveMarketEvent) => {
+        const validated = liveMarketEventSchema.safeParse(event);
+        if (!validated.success) return;
         for (const subscriber of [...listeners]) {
           try {
             subscriber(event);
