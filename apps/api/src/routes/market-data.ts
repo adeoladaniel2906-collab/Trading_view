@@ -51,7 +51,7 @@ export async function registerMarketDataRoutes(
       );
 
       const validatedCandles = candleSeriesSchema.safeParse(candles);
-      if (!validatedCandles.success) {
+      if (!validatedCandles.success || validatedCandles.data.length > query.data.limit) {
         request.log.error(
           { provider: provider.id, symbol: normalizedSymbol },
           "Market-data provider returned invalid candle data",
