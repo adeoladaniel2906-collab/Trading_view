@@ -14,10 +14,11 @@ import "./market-chart.css";
 
 interface MarketChartProps {
   readonly candles: readonly Candle[];
+  readonly liveCandle: Candle | null;
   readonly emptyMessage: string;
 }
 
-export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
+export function MarketChart({ candles, liveCandle, emptyMessage }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -85,10 +86,21 @@ export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
     }
   }, [candles]);
 
+  useEffect(() => {
+    if (!liveCandle) return;
+    seriesRef.current?.update({
+      time: liveCandle.time as UTCTimestamp as Time,
+      open: liveCandle.open,
+      high: liveCandle.high,
+      low: liveCandle.low,
+      close: liveCandle.close,
+    });
+  }, [liveCandle]);
+
   return (
     <div className="market-chart-shell">
-      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label="Market candlestick chart" />
-      {candles.length === 0 ? (
+      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label="BTC USDT live candlestick chart" />
+      {candles.length === 0 && !liveCandle ? (
         <div className="market-chart-empty" role="status">
           <span className="market-chart-empty-title">Chart engine ready</span>
           <span>{emptyMessage}</span>
