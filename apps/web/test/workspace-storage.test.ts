@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   MAX_WORKSPACE_STORAGE_CHARS,
   WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_VERSION,
   parsePersistedWorkspace,
   readPersistedWorkspace,
   writePersistedWorkspace,
@@ -60,14 +61,36 @@ test("workspace and watchlists round-trip with independent panel settings", () =
 
 test("parser rejects malformed JSON, unsupported versions and oversized payloads", () => {
   assert.equal(parsePersistedWorkspace("{"), null);
-  assert.equal(parsePersistedWorkspace(JSON.stringify({ schemaVersion: 2 })), null);
+  assert.equal(parsePersistedWorkspace(JSON.stringify({ schemaVersion: 99, watchlists: {} })), null);
   assert.equal(parsePersistedWorkspace("x".repeat(MAX_WORKSPACE_STORAGE_CHARS + 1)), null);
+});
+
+test("known version-one workspace snapshots migrate with new indicators disabled", () => {
+  const input = fixture();
+  const legacyIds = ["sma", "ema", "rsi", "macd", "bollinger", "atr", "vwap"] as const;
+  const legacyWorkspace = {
+    ...input.workspace,
+    panels: input.workspace.panels.map((panel) => ({
+      ...panel,
+      indicators: Object.fromEntries(legacyIds.map((id) => [id, panel.indicators[id]])),
+    })),
+  };
+  const legacy = {
+    schemaVersion: 1,
+    workspace: legacyWorkspace,
+    watchlists: input.watchlists,
+  };
+  const migrated = parsePersistedWorkspace(JSON.stringify(legacy));
+  assert.equal(migrated?.schemaVersion, WORKSPACE_STORAGE_VERSION);
+  assert.equal(migrated?.workspace.panels[0]?.indicators.wma, false);
+  assert.equal(migrated?.workspace.panels[0]?.indicators.stochastic, false);
+  assert.equal(migrated?.workspace.panels[0]?.indicators.obv, false);
 });
 
 test("parser rejects invalid panel identity, unsupported symbols and duplicate watchlist entries", () => {
   const input = fixture();
   const base = {
-    schemaVersion: 1,
+    schemaVersion: WORKSPACE_STORAGE_VERSION,
     workspace: input.workspace,
     watchlists: input.watchlists,
   };
