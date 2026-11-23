@@ -17,7 +17,7 @@ test("Twelve Data credential is sent only in the server-side Authorization heade
     authorization = new Headers(init?.headers).get("authorization") ?? "";
     return mockResponse({
       status: "ok",
-      meta: { exchange_timezone: "UTC" },
+      meta: { exchange_timezone: "Australia/Sydney" },
       values: [{
         datetime: "2025-01-01 00:00:00",
         open: "10", high: "12", low: "9", close: "11", volume: "100",
@@ -32,7 +32,7 @@ test("Twelve Data credential is sent only in the server-side Authorization heade
   assert.equal(authorization, "apikey test-secret-key");
   assert.equal(new URL(capturedUrl).searchParams.has("apikey"), false);
   assert.deepEqual(candles, [{
-    time: Date.parse("2025-01-01T00:00:00.000Z") / 1000,
+    time: Date.parse("2024-12-31T13:00:00.000Z") / 1000,
     open: 10, high: 12, low: 9, close: 11, volume: 100,
   }]);
 });
@@ -96,6 +96,23 @@ test("higher timeframe candles fail closed when exchange timezone metadata is mi
       new AbortController().signal,
     ),
     /omitted exchange_timezone/,
+  );
+});
+
+test("rejects a historical exchange timezone that disagrees with live Forex candle boundaries", async () => {
+  const provider = new TwelveDataProvider("test-secret-key", async () =>
+    mockResponse({
+      status: "ok",
+      meta: { exchange_timezone: "UTC" },
+      values: [{ datetime: "2025-01-01 00:00:00", open: "1", high: "2", low: "1", close: "2" }],
+    }),
+  );
+  await assert.rejects(
+    provider.getCandles(
+      { symbol: "EUR/USD", timeframe: "1d", limit: 10 },
+      new AbortController().signal,
+    ),
+    /does not match the configured Forex live calendar/,
   );
 });
 
