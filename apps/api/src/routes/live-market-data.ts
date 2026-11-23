@@ -30,6 +30,25 @@ export function candleInterval(timeframe: Timeframe, candleTime: number): number
   return Math.floor(next / 1000) - candleTime;
 }
 
+export function hasContinuousCandleCoverage(
+  candles: readonly Candle[],
+  timeframe: Timeframe,
+  start: number,
+  end: number,
+): boolean {
+  const times = new Set(candles.map((candle) => candle.time));
+  let expected = start;
+  let checked = 0;
+  while (expected <= end && checked < 500) {
+    if (!times.has(expected)) return false;
+    const interval = candleInterval(timeframe, expected);
+    if (!interval || interval <= 0) return false;
+    expected += interval;
+    checked += 1;
+  }
+  return expected > end;
+}
+
 function emit(response: ServerResponse, name: string, data: unknown): boolean {
   if (response.destroyed) return false;
   return response.write("event: " + name + "\ndata: " + JSON.stringify(data) + "\n\n");
@@ -50,6 +69,7 @@ function makeHealth(
     case "stale": messageCode = "STALE_FEED"; break;
     case "recovering": messageCode = "BACKFILLING"; break;
     case "degraded": messageCode = unresolvedFrom ? "GAP_UNRESOLVED" : "RECOVERY_FAILED"; break;
+    default: throw new Error("Unsupported feed-health state");
   }
   return feedHealthSchema.parse({
     ...request,
@@ -168,7 +188,8 @@ export async function registerLiveMarketDataRoutes(
         // Forex session closures cannot be distinguished from missing intervals without a
         // provider-backed trading calendar. Keep the feed degraded rather than claiming
         // completeness that the current implementation cannot prove.
-        const unresolved = subscription.market === "forex" || !valid.some((candle) => candle.time === unresolvedFrom)
+        const unresolved = subscription.market === "forex" ||
+          !hasContinuousCandleCoverage(validated.data, subscription.timeframe, unresolvedFrom, lastCandleTime ?? latest)
           ? unresolvedFrom
           : null;
         sendNamedEvent("recovery", {
