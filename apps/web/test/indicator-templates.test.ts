@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   INDICATOR_TEMPLATE_STORAGE_KEY,
+  MAX_INDICATOR_TEMPLATES,
   applyIndicatorTemplate,
   createIndicatorTemplate,
   deleteIndicatorTemplate,
@@ -68,6 +69,16 @@ test("upsert replaces by ID, prepends new records and delete removes only the se
   assert.equal(replaced.length, 2);
   assert.equal(replaced[0]?.name, "Trend v2");
   assert.deepEqual(deleteIndicatorTemplate(replaced, "two").map((item) => item.id), ["one"]);
+});
+
+test("template collection enforces its bounded size", () => {
+  const templates = Array.from({ length: MAX_INDICATOR_TEMPLATES }, (_, index) =>
+    makeTemplate(`template-${index}`, `Template ${index}`));
+  assert.equal(upsertIndicatorTemplate(templates, makeTemplate("overflow", "Overflow")).length, MAX_INDICATOR_TEMPLATES + 1);
+  assert.throws(() => writeIndicatorTemplates(new MemoryStorage(), [
+    ...templates,
+    makeTemplate("overflow", "Overflow"),
+  ]), /not/);
 });
 
 test("storage round-trips valid templates and preserves unknown future formats", () => {
