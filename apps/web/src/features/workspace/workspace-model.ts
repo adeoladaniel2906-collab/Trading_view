@@ -1,5 +1,6 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
 import type { IndicatorId } from "../chart/indicators";
+import type { ChartType } from "../chart/chart-types";
 
 export type WorkspaceLayout = 1 | 2 | 4;
 
@@ -8,6 +9,7 @@ export interface ChartPanelState {
   readonly market: LiveMarketName;
   readonly symbol: string;
   readonly timeframe: Timeframe;
+  readonly chartType: ChartType;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
 }
 
@@ -50,6 +52,7 @@ function defaultPanel(id: string): ChartPanelState {
     market: "crypto",
     symbol: "BTCUSDT",
     timeframe: "1m",
+    chartType: "candles",
     indicators: { sma: false, ema: false, rsi: false, macd: false, bollinger: false, atr: false, vwap: false },
   };
 }
@@ -94,6 +97,20 @@ export function selectActivePanel(state: WorkspaceState, panelId: string): Works
     throw new RangeError("Active panel must exist in the workspace");
   }
   return { ...state, activePanelId: panelId };
+}
+
+export function updatePanelChartType(
+  state: WorkspaceState,
+  panelId: string,
+  chartType: ChartType,
+): WorkspaceState {
+  if (!state.panels.some((panel) => panel.id === panelId)) {
+    throw new RangeError("Cannot update a panel that is not in the workspace");
+  }
+  return {
+    ...state,
+    panels: state.panels.map((panel) => panel.id === panelId ? { ...panel, chartType } : panel),
+  };
 }
 
 export function updatePanelIndicator(

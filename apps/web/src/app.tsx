@@ -1,12 +1,14 @@
 import { useState } from "react";
 import type { LiveMarketName } from "@market/contracts";
 import type { IndicatorId } from "./features/chart/indicators";
+import type { ChartType } from "./features/chart/chart-types";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
 import {
   createWorkspaceState,
   resizeWorkspace,
   selectActivePanel,
+  updatePanelChartType,
   updatePanelIndicator,
   updatePanelSelection,
   updateWorkspaceSync,
@@ -33,6 +35,10 @@ export function App() {
 
   const changeSelection = (panelId: string, selection: PanelSelection) => {
     setWorkspace((current) => updatePanelSelection(current, panelId, selection));
+  };
+
+  const changeChartType = (panelId: string, chartType: ChartType) => {
+    setWorkspace((current) => updatePanelChartType(current, panelId, chartType));
   };
 
   const changeIndicator = (panelId: string, indicator: IndicatorId, enabled: boolean) => {
@@ -163,6 +169,7 @@ export function App() {
               onActivate={() => setWorkspace((current) => selectActivePanel(current, panel.id))}
               onSelectionChange={(selection) => changeSelection(panel.id, selection)}
               onIndicatorChange={(indicator, enabled) => changeIndicator(panel.id, indicator, enabled)}
+              onChartTypeChange={(chartType) => changeChartType(panel.id, chartType)}
               compact={workspace.layout !== 1}
             />
           ))}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
-  CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
+  AreaSeries, BarSeries, CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
   type IChartApi, type ISeriesApi, type MouseEventParams, type Time, type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, LiveMarketName, Timeframe } from "@market/contracts";
@@ -13,6 +13,7 @@ import {
   relativeStrengthIndex, simpleMovingAverage, volumeWeightedAveragePrice,
   type IndicatorId,
 } from "./indicators";
+import { heikinAshiCandles, type ChartType } from "./chart-types";
 import "./market-chart.css";
 
 interface MarketChartProps {
@@ -24,6 +25,7 @@ interface MarketChartProps {
   readonly chartLabel: string;
   readonly emptyMessage: string;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
+  readonly chartType: ChartType;
   readonly compact?: boolean;
 }
 type DrawingMode = "none" | DrawingKind;
@@ -31,6 +33,7 @@ interface IndicatorSeriesGroup {
   readonly lines: ISeriesApi<"Line">[];
   readonly histograms: ISeriesApi<"Histogram">[];
 }
+type PriceSeries = ISeriesApi<"Candlestick"> | ISeriesApi<"Bar"> | ISeriesApi<"Line"> | ISeriesApi<"Area">;
 interface ChartPoint { readonly x: number; readonly y: number; }
 interface DragState {
   readonly drawingId: string;
@@ -44,7 +47,7 @@ const DEFAULT_STYLE = { color: DRAWING_COLORS[0], lineWidth: 2 as const, lineSty
 function contextKey(market: LiveMarketName, symbol: string, timeframe: Timeframe): string {
   return `${market}:${symbol}:${timeframe}`;
 }
-function pointForAnchor(chart: IChartApi, series: ISeriesApi<"Candlestick">, anchor: DrawingAnchor): ChartPoint | null {
+function pointForAnchor(chart: IChartApi, series: PriceSeries, anchor: DrawingAnchor): ChartPoint | null {
   const x = chart.timeScale().timeToCoordinate(anchor.time as UTCTimestamp as Time);
   const y = series.priceToCoordinate(anchor.price);
   return x === null || y === null ? null : { x, y };
@@ -64,11 +67,11 @@ function measurementLabel(drawing: ChartDrawing): string {
 
 export function MarketChart({
   candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
-  indicators, compact = false,
+  indicators, chartType, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const priceSeriesRef = useRef<PriceSeries | null>(null);
   const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const cancelLabelEditRef = useRef(false);
@@ -138,7 +141,7 @@ export function MarketChart({
 
   const anchorAt = useCallback((x: number, y: number): DrawingAnchor | null => {
     const chart = chartRef.current;
-    const series = candleSeriesRef.current;
+    const series = priceSeriesRef.current;
     if (!chart || !series) return null;
     const time = chart.timeScale().coordinateToTime(x);
     const price = series.coordinateToPrice(y);
@@ -232,10 +235,6 @@ export function MarketChart({
       timeScale: { borderColor: "#344253", timeVisible: true, secondsVisible: false },
       localization: { locale: "en-US" },
     });
-    candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
-      wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
-    });
     chartRef.current = chart;
     const refresh = () => setViewportRevision((value) => value + 1);
     chart.timeScale().subscribeVisibleLogicalRangeChange(refresh);
@@ -250,21 +249,62 @@ export function MarketChart({
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(refresh);
       chartRef.current = null;
-      candleSeriesRef.current = null;
+      priceSeriesRef.current = null;
       indicatorSeriesRef.current.clear();
       chart.remove();
     };
   }, []);
 
   useEffect(() => {
-    const series = candleSeriesRef.current;
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (priceSeriesRef.current) chart.removeSeries(priceSeriesRef.current);
+    if (chartType === "bars") {
+      priceSeriesRef.current = chart.addSeries(BarSeries, {
+        upColor: "#26a69a", downColor: "#ef5350", priceLineVisible: true,
+      });
+    } else if (chartType === "line") {
+      priceSeriesRef.current = chart.addSeries(LineSeries, {
+        color: "#d9f36a", lineWidth: 2, priceLineVisible: true, lastValueVisible: true,
+      });
+    } else if (chartType === "area") {
+      priceSeriesRef.current = chart.addSeries(AreaSeries, {
+        lineColor: "#d9f36a", topColor: "rgba(217, 243, 106, 0.28)",
+        bottomColor: "rgba(217, 243, 106, 0.02)", lineWidth: 2, priceLineVisible: true,
+      });
+    } else {
+      priceSeriesRef.current = chart.addSeries(CandlestickSeries, {
+        upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
+        wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
+      });
+    }
+  }, [chartType]);
+
+  useEffect(() => {
+    const series = priceSeriesRef.current;
     if (!series) return;
-    series.setData(candles.map((candle) => ({
-      time: candle.time as UTCTimestamp as Time,
-      open: candle.open, high: candle.high, low: candle.low, close: candle.close,
-    })));
+    const ohlc = chartType === "heikin-ashi" ? heikinAshiCandles(candles) : candles;
+    if (chartType === "line") {
+      (series as ISeriesApi<"Line">).setData(candles.map((candle) => ({
+        time: candle.time as UTCTimestamp as Time, value: candle.close,
+      })));
+    } else if (chartType === "area") {
+      (series as ISeriesApi<"Area">).setData(candles.map((candle) => ({
+        time: candle.time as UTCTimestamp as Time, value: candle.close,
+      })));
+    } else if (chartType === "bars") {
+      (series as ISeriesApi<"Bar">).setData(ohlc.map((candle) => ({
+        time: candle.time as UTCTimestamp as Time,
+        open: candle.open, high: candle.high, low: candle.low, close: candle.close,
+      })));
+    } else {
+      (series as ISeriesApi<"Candlestick">).setData(ohlc.map((candle) => ({
+        time: candle.time as UTCTimestamp as Time,
+        open: candle.open, high: candle.high, low: candle.low, close: candle.close,
+      })));
+    }
     if (candles.length) chartRef.current?.timeScale().fitContent();
-  }, [candles]);
+  }, [candles, chartType]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -351,18 +391,38 @@ export function MarketChart({
 
   useEffect(() => {
     if (!liveCandle) return;
-    candleSeriesRef.current?.update({
-      time: liveCandle.time as UTCTimestamp as Time,
-      open: liveCandle.open, high: liveCandle.high, low: liveCandle.low, close: liveCandle.close,
-    });
-  }, [liveCandle]);
+    const series = priceSeriesRef.current;
+    if (!series) return;
+    if (chartType === "line") {
+      (series as ISeriesApi<"Line">).update({
+        time: liveCandle.time as UTCTimestamp as Time, value: liveCandle.close,
+      });
+    } else if (chartType === "area") {
+      (series as ISeriesApi<"Area">).update({
+        time: liveCandle.time as UTCTimestamp as Time, value: liveCandle.close,
+      });
+    } else if (chartType === "heikin-ashi") {
+      const latest = heikinAshiCandles(availableCandles).at(-1);
+      if (latest) (series as ISeriesApi<"Candlestick">).update({
+        time: latest.time as UTCTimestamp as Time,
+        open: latest.open, high: latest.high, low: latest.low, close: latest.close,
+      });
+    } else {
+      const data = {
+        time: liveCandle.time as UTCTimestamp as Time,
+        open: liveCandle.open, high: liveCandle.high, low: liveCandle.low, close: liveCandle.close,
+      };
+      if (chartType === "bars") (series as ISeriesApi<"Bar">).update(data);
+      else (series as ISeriesApi<"Candlestick">).update(data);
+    }
+  }, [liveCandle, chartType, availableCandles]);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || mode === "none") return;
     const handleClick = (event: MouseEventParams<Time>) => {
       if (!event.point) return;
-      const series = candleSeriesRef.current;
+      const series = priceSeriesRef.current;
       if (!series) return;
       const price = series.coordinateToPrice(event.point.y);
       const time = chart.timeScale().coordinateToTime(event.point.x);
@@ -412,7 +472,7 @@ export function MarketChart({
   }, [history, selectedId, commit, redo, undo, cancel]);
 
   const chart = chartRef.current;
-  const series = candleSeriesRef.current;
+  const series = priceSeriesRef.current;
   const renderShape = (drawing: ChartDrawing) => {
     if (!drawing.visible || !chart || !series) return null;
     const activeDrawing = dragPreview?.drawingId === drawing.id
