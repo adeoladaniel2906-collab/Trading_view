@@ -12,7 +12,8 @@ import { loadDrawingHistory, saveDrawingHistory } from "./drawing-storage";
 import { getBrowserStorage } from "../workspace/workspace-storage";
 import {
   averageTrueRange, bollingerBands, exponentialMovingAverage, movingAverageConvergenceDivergence,
-  relativeStrengthIndex, simpleMovingAverage, volumeWeightedAveragePrice,
+  onBalanceVolume, relativeStrengthIndex, simpleMovingAverage, stochasticOscillator,
+  volumeWeightedAveragePrice, volumeWeightedMovingAverage, weightedMovingAverage,
   type IndicatorId,
 } from "./indicators";
 import { heikinAshiCandles, type ChartType } from "./chart-types";
@@ -336,11 +337,13 @@ export function MarketChart({
       lastValueVisible: false, crosshairMarkerVisible: false,
     });
     const createGroup = (id: IndicatorId): IndicatorSeriesGroup => {
-      const paneIndex = ["sma", "ema", "bollinger", "vwap"].includes(id) ? 0 : chart.panes().length;
+      const paneIndex = ["sma", "ema", "wma", "vwma", "bollinger", "vwap"].includes(id) ? 0 : chart.panes().length;
       const lines: ISeriesApi<"Line">[] = [];
       const histograms: ISeriesApi<"Histogram">[] = [];
       if (id === "sma") lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
       if (id === "ema") lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
+      if (id === "wma") lines.push(chart.addSeries(LineSeries, lineOptions("#26a69a"), paneIndex));
+      if (id === "vwma") lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3", LineStyle.Dashed), paneIndex));
       if (id === "bollinger") {
         lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3", LineStyle.Dashed), paneIndex));
         lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
@@ -350,6 +353,11 @@ export function MarketChart({
       if (id === "rsi") lines.push(chart.addSeries(LineSeries, {
         ...lineOptions("#d9f36a"), priceFormat: { type: "price", precision: 2, minMove: 0.01 },
       }, paneIndex));
+      if (id === "stochastic") {
+        lines.push(chart.addSeries(LineSeries, { ...lineOptions("#d9f36a"), priceFormat: { type: "price", precision: 2, minMove: 0.01 } }, paneIndex));
+        lines.push(chart.addSeries(LineSeries, { ...lineOptions("#a9b4c3"), priceFormat: { type: "price", precision: 2, minMove: 0.01 } }, paneIndex));
+      }
+      if (id === "obv") lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
       if (id === "macd") {
         lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
         lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
@@ -362,7 +370,7 @@ export function MarketChart({
       series?.setData(points.map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value })));
     };
 
-    const ids: readonly IndicatorId[] = ["sma", "ema", "bollinger", "vwap", "rsi", "macd", "atr"];
+    const ids: readonly IndicatorId[] = ["sma", "ema", "wma", "vwma", "bollinger", "vwap", "rsi", "macd", "stochastic", "atr", "obv"];
     for (const id of ids) {
       const enabled = indicators[id];
       let group = indicatorSeriesRef.current.get(id);
@@ -379,6 +387,8 @@ export function MarketChart({
       }
       if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, 20));
       if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, 20));
+      if (id === "wma") setLine(group.lines[0], weightedMovingAverage(data, 20));
+      if (id === "vwma") setLine(group.lines[0], volumeWeightedMovingAverage(data, 20));
       if (id === "bollinger") {
         const points = bollingerBands(data, 20, 2);
         const upper = points.map((point) => ({ time: point.time, value: point.upper }));
@@ -390,6 +400,12 @@ export function MarketChart({
       }
       if (id === "vwap") setLine(group.lines[0], volumeWeightedAveragePrice(data));
       if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, 14));
+      if (id === "stochastic") {
+        const points = stochasticOscillator(data, 14, 3);
+        setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.k })));
+        setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.d })));
+      }
+      if (id === "obv") setLine(group.lines[0], onBalanceVolume(data));
       if (id === "atr") setLine(group.lines[0], averageTrueRange(data, 14));
       if (id === "macd") {
         const points = movingAverageConvergenceDivergence(data, 12, 26, 9);
