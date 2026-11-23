@@ -17,6 +17,7 @@ test("Twelve Data credential is sent only in the server-side Authorization heade
     authorization = new Headers(init?.headers).get("authorization") ?? "";
     return mockResponse({
       status: "ok",
+      meta: { exchange_timezone: "UTC" },
       values: [{
         datetime: "2025-01-01 00:00:00",
         open: "10", high: "12", low: "9", close: "11", volume: "100",
@@ -52,6 +53,52 @@ test("Twelve Data adapter maps interval and requests ascending UTC data", async 
   assert.equal(requestedUrl?.searchParams.get("timezone"), "UTC");
 });
 
+test("daily, weekly and monthly candles use the provider exchange timezone", async () => {
+  const provider = new TwelveDataProvider("test-secret-key", async () =>
+    mockResponse({
+      status: "ok",
+      meta: { exchange_timezone: "Australia/Sydney" },
+      values: [
+        { datetime: "2025-01-01 00:00:00", open: "1", high: "2", low: "1", close: "2" },
+      ],
+    }),
+  );
+
+  const daily = await provider.getCandles(
+    { symbol: "EUR/USD", timeframe: "1d", limit: 10 },
+    new AbortController().signal,
+  );
+  assert.equal(daily[0]?.time, Date.parse("2024-12-31T13:00:00.000Z") / 1000);
+
+  const weekly = await provider.getCandles(
+    { symbol: "EUR/USD", timeframe: "1w", limit: 10 },
+    new AbortController().signal,
+  );
+  assert.equal(weekly[0]?.time, Date.parse("2024-12-31T13:00:00.000Z") / 1000);
+
+  const monthly = await provider.getCandles(
+    { symbol: "EUR/USD", timeframe: "1M", limit: 10 },
+    new AbortController().signal,
+  );
+  assert.equal(monthly[0]?.time, Date.parse("2024-12-31T13:00:00.000Z") / 1000);
+});
+
+test("higher timeframe candles fail closed when exchange timezone metadata is missing", async () => {
+  const provider = new TwelveDataProvider("test-secret-key", async () =>
+    mockResponse({
+      status: "ok",
+      values: [{ datetime: "2025-01-01 00:00:00", open: "1", high: "2", low: "1", close: "2" }],
+    }),
+  );
+  await assert.rejects(
+    provider.getCandles(
+      { symbol: "EUR/USD", timeframe: "1d", limit: 10 },
+      new AbortController().signal,
+    ),
+    /omitted exchange_timezone/,
+  );
+});
+
 test("missing traded volume remains unavailable rather than becoming fabricated zero", async () => {
   const provider = new TwelveDataProvider("test-secret-key", async () =>
     mockResponse({
@@ -76,6 +123,7 @@ test("provider errors and malformed candle rows are rejected", async () => {
   const malformed = new TwelveDataProvider("test-secret-key", async () =>
     mockResponse({
       status: "ok",
+      meta: { exchange_timezone: "UTC" },
       values: [{ datetime: "not-a-date", open: "x", high: "2", low: "1", close: "1.5" }],
     }),
   );
