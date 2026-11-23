@@ -19,6 +19,7 @@ import {
   updatePanelSelection,
   updateWorkspaceSync,
   type IndicatorParameterKey,
+  type IndicatorParameterValue,
   type PanelSelection,
   type WorkspaceLayout,
 } from "./features/workspace/workspace-model";
@@ -55,7 +56,7 @@ export function App() {
     setWorkspace((current) => updatePanelSelection(current, panelId, selection));
   };
 
-  const changeIndicatorParameter = (panelId: string, parameter: IndicatorParameterKey, value: number) => {
+  const changeIndicatorParameter = (panelId: string, parameter: IndicatorParameterKey, value: IndicatorParameterValue) => {
     setWorkspace((current) => updatePanelIndicatorParameter(current, panelId, parameter, value));
   };
 
