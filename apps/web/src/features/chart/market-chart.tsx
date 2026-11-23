@@ -580,6 +580,8 @@ export function MarketChart({
 
   useEffect(() => {
     if (!liveCandle) return;
+    const latestHistoryTime = candles.at(-1)?.time ?? 0;
+    if (liveCandle.time < latestHistoryTime) return;
     candleSeriesRef.current?.update({
       time: liveCandle.time as UTCTimestamp as Time,
       open: liveCandle.open,
@@ -588,7 +590,7 @@ export function MarketChart({
       close: liveCandle.close,
     });
     setOverlayVersion((version) => version + 1);
-  }, [liveCandle]);
+  }, [liveCandle, candles]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -711,7 +713,7 @@ export function MarketChart({
         ) : null}
         {selected && anchors.map((anchor) => (
           <circle
-            key={`${drawing.id}-${anchor.time}-${anchor.price}`}
+            key={`${drawing.id}-${anchor.x}-${anchor.y}`}
             cx={anchor.x}
             cy={anchor.y}
             r={4}
@@ -804,7 +806,7 @@ export function MarketChart({
         ) : null}
       </div>
 
-      <details className="drawing-object-tree" defaultOpen={drawings.length > 0}>
+      <details className="drawing-object-tree">
         <summary>Drawings ({drawings.length}/100)</summary>
         {drawings.length === 0 ? (
           <p className="drawing-object-empty">No drawings in this instrument and timeframe.</p>
