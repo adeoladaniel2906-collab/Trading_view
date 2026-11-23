@@ -91,7 +91,7 @@ test("live hub shares one upstream subscription between consumers", () => {
     candle: { time: 1_700_000_000, open: 10, high: 12, low: 9, close: 11, volume: 5 },
     closed: false,
   };
-  provider.listeners.get("BTCUSDT:1m")?.forEach((listener) => listener(event));
+  for (const listener of provider.listeners.get("BTCUSDT:1m") ?? []) listener(event);
   assert.equal(first, 1);
   assert.equal(second, 1);
 
