@@ -236,7 +236,16 @@ export function App() {
             />
             Crosshair
           </label>
-          <span className="sync-note">Crosshair aligns to the nearest available UTC candle. Drawings remain isolated by exact chart context.</span>
+          <label>
+            <input
+              type="checkbox"
+              checked={workspace.sync.drawings}
+              onChange={(event) => setWorkspace((current) =>
+                updateWorkspaceSync(current, { drawings: event.currentTarget.checked }))}
+            />
+            Drawings
+          </label>
+          <span className="sync-note">Crosshair aligns to the nearest UTC candle. Drawings sync only across panels with the exact same market, symbol and timeframe.</span>
         </div>
 
         <div className="chart-workspace-tools">
@@ -287,6 +296,7 @@ export function App() {
               onChartTypeChange={(chartType) => changeChartType(panel.id, chartType)}
               compact={workspace.layout !== 1}
               syncCrosshair={workspace.sync.crosshair}
+              syncDrawings={workspace.sync.drawings}
               crosshairTime={
                 crosshairSyncState?.sourcePanelId !== panel.id ? crosshairSyncState?.time ?? null : null
               }
