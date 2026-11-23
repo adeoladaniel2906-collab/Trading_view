@@ -43,13 +43,14 @@ function makeHealth(
   lastReceivedAt: number | null,
   unresolvedFrom: number | null,
 ): FeedHealth {
-  const messageCode: FeedHealth["messageCode"] = {
-    connecting: "CONNECTING",
-    live: "HEALTHY",
-    stale: "STALE_FEED",
-    recovering: "BACKFILLING",
-    degraded: unresolvedFrom ? "GAP_UNRESOLVED" : "RECOVERY_FAILED",
-  }[state];
+  let messageCode: FeedHealth["messageCode"];
+  switch (state) {
+    case "connecting": messageCode = "CONNECTING"; break;
+    case "live": messageCode = "HEALTHY"; break;
+    case "stale": messageCode = "STALE_FEED"; break;
+    case "recovering": messageCode = "BACKFILLING"; break;
+    case "degraded": messageCode = unresolvedFrom ? "GAP_UNRESOLVED" : "RECOVERY_FAILED"; break;
+  }
   return feedHealthSchema.parse({
     ...request,
     provider,
@@ -237,6 +238,15 @@ export async function registerLiveMarketDataRoutes(
       if (response?.destroyed) {
         cleanup();
         return;
+      }
+      if (
+        subscription.market === "crypto" &&
+        lastReceivedAt !== null &&
+        Date.now() - lastReceivedAt > 15_000 &&
+        !staleReported
+      ) {
+        staleReported = true;
+        sendHealth("stale");
       }
       if (response && !response.write(": keep-alive\n\n")) {
         cleanup();
