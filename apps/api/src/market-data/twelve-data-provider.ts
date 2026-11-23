@@ -94,12 +94,16 @@ export class TwelveDataProvider implements MarketDataProvider {
     if (!response.ok) {
       throw new Error("Twelve Data request failed with status " + response.status);
     }
-    const contentLength = Number(response.headers.get("content-length") ?? "0");
-    if (contentLength > 1_000_000) {
+    const responseText = await response.text();
+    if (responseText.length > 1_000_000) {
       throw new Error("Twelve Data response exceeded the size limit");
     }
-
-    const payload: unknown = await response.json();
+    let payload: unknown;
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      throw new Error("Twelve Data returned invalid JSON");
+    }
     if (payload === null || typeof payload !== "object") {
       throw new Error("Invalid Twelve Data response");
     }
