@@ -1,67 +1,48 @@
 # Market Workspace
 
-An independent market-charting and analysis platform. This repository contains the application foundation only; it does not yet provide live prices, trading execution, investment advice, or a production authentication system.
+An independent market-charting and analysis platform. The repository does not provide trading execution, investment advice, or live market prices until a licensed data provider is configured.
 
 ## Architecture
 
-```text
-apps/
-  web/       React + Vite browser application
-  api/       Fastify HTTP API
-packages/
-  contracts/ Shared runtime schemas and TypeScript contracts
-```
+- apps/web: React, TypeScript, Vite, and TradingView Lightweight Charts.
+- apps/api: Fastify HTTP API and provider boundary.
+- packages/contracts: shared Zod schemas and TypeScript contracts.
 
-The frontend and API are separate deployable applications. Shared contracts are a small package, not a shared database or a dependency on server implementation details.
+The browser renders charts. The API owns market-data provider credentials and upstream requests. Providers implement a narrow interface and cannot bypass shared OHLCV validation. The frontend never receives provider secrets.
 
-### Technology choices
+## Charting and market data
 
-- React and TypeScript for the browser application.
-- Vite for frontend development and production builds.
-- Fastify 5 for the API and its plugin-based security boundary.
-- Zod for runtime validation of environment configuration and shared contracts.
-- pnpm workspaces for dependency and package boundaries.
-- Biome for consistent formatting and lint checks.
-- Node's built-in test runner for API integration tests.
+The chart renderer uses Lightweight Charts 5.3.0. It is a chart-rendering library, not a market-data service. Its required attribution is included in the application footer and the root NOTICE file.
 
-Market-data adapters, chart rendering, persistence, authentication, and alert delivery are intentionally deferred. The first market-data adapter must be selected only after reviewing provider coverage, licensing, latency, rate limits, and cost.
+The API exposes GET /v1/markets/:symbol/candles with timeframe and limit query parameters. A provider is injected into the API at application construction. If no provider is configured, the endpoint returns 503 instead of inventing prices. Provider output is checked for finite OHLCV values, valid high/low bounds, non-negative volume, and strictly ascending unique Unix-second timestamps.
 
-## Requirements
+Supported timeframe contracts: 1m, 5m, 15m, 1h, 4h, 1d, and 1w. The maximum candle request is 2,000 items.
 
-- Node.js 24 LTS
-- pnpm 10
+No vendor adapter is selected in this phase. Before choosing one, compare exchange coverage, licensing and redistribution rights, historical depth, streaming support, latency, reliability, rate limits, and total cost. Provider credentials must remain server-side.
 
 ## Local setup
 
-1. Copy `.env.example` to `.env`.
-2. Install dependencies: `pnpm install`.
-3. Build the shared contracts and start both applications: `pnpm dev`.
-4. Open the Vite URL shown in the terminal (normally http://localhost:5173).
-5. The API health endpoint is http://127.0.0.1:3000/health.
+1. Use Node.js 24 and pnpm 10.
+2. Copy .env.example to .env.
+3. Run pnpm install.
+4. Run pnpm dev.
+5. Open the Vite URL shown in the terminal. The API health endpoint is http://127.0.0.1:3000/health.
 
-The API binds to loopback by default. Set `HOST=0.0.0.0` only when the deployment environment requires an externally reachable container port. In production, set `WEB_ORIGINS` to the exact HTTPS origin(s) of the deployed frontend.
+The API binds to loopback by default. Set HOST=0.0.0.0 only when the deployment environment requires an externally reachable container port. Set WEB_ORIGINS to exact HTTPS origins in production.
 
 ## Quality checks
 
-- `pnpm check` - lint checks.
-- `pnpm format` - apply consistent formatting.
-- `pnpm typecheck` - TypeScript checks for all workspaces.
-- `pnpm test` - API integration tests.
-- `pnpm build` - production builds.
-- `pnpm audit` - dependency vulnerability audit.
+- pnpm check
+- pnpm typecheck
+- pnpm test
+- pnpm audit
+- pnpm build
 
-Commit the generated `pnpm-lock.yaml` after the first install. CI currently resolves exact direct dependency versions and runs the same checks; once the lockfile is committed, switch CI installs to frozen-lockfile mode.
+## Security notes
 
-## Security baseline
-
-- No secrets belong in source control or in `VITE_*` variables.
-- API configuration is parsed and validated at startup.
-- CORS uses an explicit origin allowlist and does not enable credential sharing.
-- Helmet security headers and global API rate limiting are enabled.
-- Proxy headers are not trusted by default.
-- Request bodies are size-limited; request identifiers are generated server-side.
-- Sensitive request/response fields are redacted from logs.
-- Validation errors return a generic client response; internal errors are not exposed.
-- CI runs dependency auditing, automated code checks, and GitHub CodeQL analysis.
-
-This is a foundation, not a completed production security review. Before public launch, add authentication and authorization, database access controls, persistent distributed rate limiting, observability, backups, deployment-specific CSP, secret management, and an independent security review.
+- No secrets belong in source control or VITE_ variables.
+- Provider errors are returned as generic upstream errors and are not forwarded to clients.
+- Market-data responses are runtime-validated before leaving the API.
+- API request limits, CORS allowlisting, security headers, request-size limits, and log redaction remain enabled.
+- The current in-memory rate limiter is suitable only for a single API instance. Production multi-instance deployments need a shared store.
+- Authentication, authorization, persistent storage, alerts, and production deployment hardening remain separate future milestones.

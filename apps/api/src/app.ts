@@ -4,9 +4,15 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import type { AppConfig } from "./config/env.js";
+import type { MarketDataProvider } from "./market-data/provider.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerMarketDataRoutes } from "./routes/market-data.js";
 
-export async function buildApp(config: AppConfig) {
+interface AppDependencies {
+  readonly marketDataProvider?: MarketDataProvider;
+}
+
+export async function buildApp(config: AppConfig, dependencies: AppDependencies = {}) {
   const app = Fastify({
     logger: {
       level: config.NODE_ENV === "production" ? "info" : "debug",
@@ -80,5 +86,6 @@ export async function buildApp(config: AppConfig) {
   });
 
   await registerHealthRoutes(app);
+  await registerMarketDataRoutes(app, dependencies.marketDataProvider);
   return app;
 }

@@ -26,19 +26,18 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
 .panel-heading h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
 .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid #344253; border-radius: 999px; color: #b8c4d3; font-size: 11px; white-space: nowrap; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #d9f36a; }
-.chart-placeholder { display: grid; min-height: 360px; align-content: center; justify-items: center; padding: 32px 20px; text-align: center; background-image: linear-gradient(#25303d 1px, transparent 1px), linear-gradient(90deg, #25303d 1px, transparent 1px); background-size: 48px 48px; background-position: center; }
-.placeholder-icon { display: grid; width: 56px; height: 56px; margin-bottom: 18px; place-items: center; border: 1px solid #394759; border-radius: 14px; background: #1a2430; }
-.placeholder-icon svg { width: 30px; stroke: #d9f36a; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
-.placeholder-title { margin-bottom: 8px; font-size: 15px; font-weight: 600; }
-.placeholder-copy { max-width: 360px; margin-bottom: 0; color: #94a0b1; font-size: 13px; line-height: 1.6; }
+.chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 54px; padding: 12px 20px; border-bottom: 1px solid #2a3544; }
+.chart-symbol { color: #e8edf5; font-size: 13px; font-weight: 650; }
+.chart-timeframe { color: #8491a2; font-size: 11px; }
 .footer { display: flex; justify-content: space-between; gap: 16px; padding-top: 20px; color: #7f8b9b; font-size: 11px; }
+.footer a { color: #aeb9c8; text-underline-offset: 3px; }
 @media (max-width: 640px) {
   .workspace { padding: 0 16px 22px; }
   .topbar { min-height: 62px; }
   .environment-label { font-size: 9px; }
   .intro { padding: 56px 0 32px; }
   .panel-heading { align-items: flex-start; flex-direction: column; padding: 18px; }
-  .chart-placeholder { min-height: 300px; }
+  .chart-toolbar { align-items: flex-start; flex-direction: column; gap: 6px; }
   .footer { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
