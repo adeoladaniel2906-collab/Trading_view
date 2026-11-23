@@ -7,7 +7,7 @@ import {
   saveDrawingHistory,
   subscribeDrawingHistory,
 } from "../src/features/chart/drawing-storage.js";
-import { validateDrawing, type ChartDrawing } from "../src/features/chart/drawings.js";
+import { createDrawingHistory, validateDrawing, type ChartDrawing } from "../src/features/chart/drawings.js";
 import type { KeyValueStorage } from "../src/features/workspace/workspace-storage.js";
 
 class MemoryStorage implements KeyValueStorage {
@@ -67,6 +67,7 @@ test("live drawing sync is isolated by exact context and supports unsubscribe", 
   });
   const state = loadDrawingHistory(context, new MemoryStorage());
   publishDrawingHistory(otherContext, state, "panel-other");
+  publishDrawingHistory(context, createDrawingHistory([drawing("wrong-context", otherContext)]), "panel-invalid");
   assert.deepEqual(received, []);
   publishDrawingHistory(context, state, "panel-source");
   assert.deepEqual(received, ["panel-source:0"]);
