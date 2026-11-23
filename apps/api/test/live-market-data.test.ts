@@ -1,10 +1,42 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import WebSocket from "ws";
 import test from "node:test";
 import type { LiveMarketEvent, LiveMarketRequest } from "@market/contracts";
 import { buildApp } from "../src/app.js";
 import { LiveMarketDataHub } from "../src/market-data/live/hub.js";
+import { BinanceLiveProvider } from "../src/market-data/live/binance-provider.js";
+import { TwelveDataLiveProvider } from "../src/market-data/live/twelve-data-provider.js";
 import type { LiveMarketDataProvider, LiveMarketListener } from "../src/market-data/live/provider.js";
 import type { AppConfig } from "../src/config/env.js";
+
+
+class FakeSocket extends EventEmitter {
+  readyState = WebSocket.CONNECTING;
+  readonly sent: string[] = [];
+
+  constructor(readonly url: string) {
+    super();
+  }
+
+  send(data: string): void {
+    this.sent.push(data);
+  }
+
+  close(): void {
+    this.readyState = WebSocket.CLOSED;
+    this.emit("close", 1000, Buffer.from(""));
+  }
+
+  open(): void {
+    this.readyState = WebSocket.OPEN;
+    this.emit("open");
+  }
+
+  message(payload: unknown): void {
+    this.emit("message", Buffer.from(JSON.stringify(payload)));
+  }
+}
 
 const config: AppConfig = {
   NODE_ENV: "test",
@@ -118,4 +150,82 @@ test("live stream route returns unavailable when no hub is configured", async ()
   } finally {
     await app.close();
   }
+});
+
+
+test("Binance adapter multiplexes a live kline stream and normalizes candle updates", () => {
+  let socket: FakeSocket | undefined;
+  const provider = new BinanceLiveProvider((url) => {
+    assert.equal(url, "wss://stream.binance.com:9443/stream");
+    socket = new FakeSocket(url);
+    return socket as unknown as WebSocket;
+  });
+  const events: LiveMarketEvent[] = [];
+  const unsubscribe = provider.subscribe(
+    { market: "crypto", symbol: "BTCUSDT", timeframe: "1m" },
+    (event) => events.push(event),
+  );
+
+  assert.ok(socket);
+  socket.open();
+  assert.deepEqual(JSON.parse(socket.sent[0] ?? "{}").params, ["btcusdt@kline_1m"]);
+  socket.message({
+    stream: "btcusdt@kline_1m",
+    data: {
+      e: "kline", E: 1_700_000_000_100, s: "BTCUSDT",
+      k: { t: 1_700_000_000_000, o: "100", h: "105", l: "99", c: "103", v: "7", x: false },
+    },
+  });
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "candle");
+  if (events[0]?.kind === "candle") {
+    assert.equal(events[0].symbol, "BTCUSDT");
+    assert.equal(events[0].candle.close, 103);
+    assert.equal(events[0].closed, false);
+  }
+
+  unsubscribe();
+  assert.deepEqual(JSON.parse(socket.sent[1] ?? "{}").method, "UNSUBSCRIBE");
+  provider.close();
+});
+
+test("Twelve Data adapter keeps its API key in a server-side WebSocket header", () => {
+  let socket: FakeSocket | undefined;
+  const provider = new TwelveDataLiveProvider("server-only-secret", (url, key) => {
+    assert.equal(url, "wss://ws.twelvedata.com/v1/quotes/price");
+    assert.equal(key, "server-only-secret");
+    socket = new FakeSocket(url);
+    return socket as unknown as WebSocket;
+  });
+  const events: LiveMarketEvent[] = [];
+  const unsubscribe = provider.subscribe(
+    { market: "forex", symbol: "EUR/USD", timeframe: "1m" },
+    (event) => events.push(event),
+  );
+
+  assert.ok(socket);
+  socket.open();
+  assert.deepEqual(JSON.parse(socket.sent[0] ?? "{}"), {
+    action: "subscribe",
+    params: { symbols: "EUR/USD" },
+  });
+  socket.message({
+    event: "price",
+    symbol: "EUR/USD",
+    timestamp: 1_700_000_000,
+    price: 1.08,
+    bid: 1.079,
+    ask: 1.081,
+  });
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "price");
+  if (events[0]?.kind === "price") {
+    assert.equal(events[0].price, 1.08);
+    assert.equal(events[0].bid, 1.079);
+  }
+  assert.equal(socket.url.includes("server-only-secret"), false);
+  unsubscribe();
+  provider.close();
 });
