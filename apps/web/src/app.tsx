@@ -1,6 +1,7 @@
+import type { Candle } from "@market/contracts";
 import { MarketChart } from "./features/chart/market-chart";
 
-const EMPTY_CANDLES = [];
+const EMPTY_CANDLES: readonly Candle[] = [];
 
 export function App() {
   return (
