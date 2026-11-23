@@ -299,12 +299,12 @@ export function App() {
               <span className="sync-note">Drawings synchronize only across identical market, symbol and timeframe contexts.</span>
             </div>
             </div>
-            {${activePanel ? (
+            {activePanel ? (
               <div className="terminal-tools-section">
                 <strong>Risk planning</strong>
                 <RiskPlanner market={activePanel.market} symbol={activePanel.symbol} timeframe={activePanel.timeframe} />
               </div>
-            ) : null}}
+            ) : null}
           </div>
         </details>
       </header>
