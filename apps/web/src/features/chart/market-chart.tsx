@@ -670,28 +670,34 @@ export function MarketChart({
   return (
     <div className={compact ? "market-chart-shell is-compact" : "market-chart-shell"}>
       <div className="drawing-toolbar" role="toolbar" aria-label="Chart drawing tools">
-        {(["horizontal", "vertical", "trendline", "ray", "rectangle", "measurement"] as const).map((tool) => (
-          <button key={tool} type="button" onClick={() => { setPendingAnchor(null); setMode(tool); }}
-            aria-pressed={mode === tool}>{tool === "trendline" ? "Trend line" : tool === "measurement" ? "Measure" : tool}</button>
-        ))}
-        <button type="button" onClick={undo} disabled={!history.undoStack.length} aria-label="Undo drawing">Undo</button>
-        <button type="button" onClick={redo} disabled={!history.redoStack.length} aria-label="Redo drawing">Redo</button>
-        {mode !== "none" ? <button type="button" onClick={cancel}>Cancel</button> : null}
-        <label className="drawing-option">Snap
-          <select value={snapMode} onChange={(event) => setSnapMode(event.currentTarget.value as DrawingSnapMode)}>
+        {(["horizontal", "vertical", "trendline", "ray", "rectangle", "measurement"] as const).map((tool) => {
+          const labels = { horizontal: "H", vertical: "V", trendline: "TL", ray: "Ray", rectangle: "Box", measurement: "Measure" } as const;
+          const names = { horizontal: "Horizontal line", vertical: "Vertical line", trendline: "Trend line", ray: "Ray", rectangle: "Rectangle", measurement: "Measure" } as const;
+          return (
+            <button key={tool} type="button" title={names[tool]} aria-label={names[tool]}
+              onClick={() => { setPendingAnchor(null); setMode(tool); }} aria-pressed={mode === tool}>
+              {labels[tool]}
+            </button>
+          );
+        })}
+        <span className="drawing-toolbar-divider" />
+        <button type="button" onClick={undo} disabled={!history.undoStack.length}
+          aria-label="Undo drawing" title="Undo">↶</button>
+        <button type="button" onClick={redo} disabled={!history.redoStack.length}
+          aria-label="Redo drawing" title="Redo">↷</button>
+        {mode !== "none" ? <button type="button" onClick={cancel} aria-label="Cancel drawing" title="Cancel">×</button> : null}
+        <label className="drawing-option drawing-snap-option" title="Snap drawings to candle values">
+          <span>Snap</span>
+          <select aria-label="Drawing snap mode" value={snapMode}
+            onChange={(event) => setSnapMode(event.currentTarget.value as DrawingSnapMode)}>
             <option value="off">Off</option><option value="weak">Weak</option><option value="strong">Strong</option>
           </select>
         </label>
-        <label className="drawing-option"><input type="checkbox" checked={keepDrawing}
-          onChange={(event) => setKeepDrawing(event.currentTarget.checked)} /> Keep drawing</label>
-        <span className="drawing-hint" aria-live="polite">
-          {mode === "none"
-            ? drawingStorageStatus === "saved"
-              ? "Drawings are saved in this browser for this symbol and timeframe."
-              : "Browser storage unavailable; drawings will not survive a reload."
-            : mode === "horizontal" || mode === "vertical" ? "Click once to place the line."
-              : pendingAnchor ? "Click a second point to finish the drawing." : "Click the first point on the chart."}
-        </span>
+        <label className="drawing-option drawing-keep-option" title="Keep drawing tool active">
+          <input type="checkbox" checked={keepDrawing}
+            onChange={(event) => setKeepDrawing(event.currentTarget.checked)} />
+          <span>Keep</span>
+        </label>
       </div>
       <div className="market-chart-stage">
         <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={`${chartLabel} live candlestick chart`} />
