@@ -25,7 +25,12 @@ export function reconcileCandles(input: ReconcileCandlesInput): readonly Candle[
     if (!parsed.success || typeof event.closed !== "boolean") {
       throw new Error("Live candle updates must satisfy the candle contract");
     }
-    liveByTime.set(parsed.data.time, { candle: parsed.data, closed: event.closed });
+    const previous = liveByTime.get(parsed.data.time);
+    // Once an interval is observed closed, a delayed open update must not
+    // regress it. Otherwise, the latest update supplied for that interval wins.
+    if (!previous || event.closed || !previous.closed) {
+      liveByTime.set(parsed.data.time, { candle: parsed.data, closed: event.closed });
+    }
   }
 
   const merged = new Map<number, Candle>();
