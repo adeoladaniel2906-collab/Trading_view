@@ -1,4 +1,5 @@
 import {
+  candleSeriesSchema,
   feedHealthSchema,
   timeframeSchema,
   type Candle,
@@ -156,17 +157,28 @@ export async function registerLiveMarketDataRoutes(
           subscription,
         );
         if (closed || !response) return;
-        const valid = candles.filter((candle) => candle.time >= unresolvedFrom);
+        const validated = candleSeriesSchema.safeParse(candles);
+        if (!validated.success || validated.data.length > 500) {
+          throw new Error("Historical recovery returned invalid candle data");
+        }
+        const valid = validated.data.filter((candle) => candle.time >= unresolvedFrom);
         const latest = valid.at(-1)?.time ?? lastCandleTime ?? unresolvedFrom;
+        // Forex session closures cannot be distinguished from missing intervals without a
+        // provider-backed trading calendar. Keep the feed degraded rather than claiming
+        // completeness that the current implementation cannot prove.
+        const unresolved = subscription.market === "forex" || !valid.some((candle) => candle.time === unresolvedFrom)
+          ? unresolvedFrom
+          : null;
         sendNamedEvent("recovery", {
           market: subscription.market,
           symbol: subscription.symbol,
           timeframe: subscription.timeframe,
-          candles,
+          candles: validated.data,
           reconciledThrough: latest,
-          unresolvedFrom: null,
+          unresolvedFrom: unresolved,
         });
-        sendHealth("live");
+        if (unresolved === null) sendHealth("live");
+        else sendHealth("degraded", unresolved);
       } catch {
         if (!closed && response) sendHealth("degraded", unresolvedFrom);
       } finally {
