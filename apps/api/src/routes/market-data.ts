@@ -35,6 +35,9 @@ export async function registerMarketDataRoutes(
     if (!selectedProvider) {
       return reply.code(503).send({ error: { code: "MARKET_DATA_UNAVAILABLE", message: "A market-data provider has not been configured for this market." } });
     }
+    if (selectedProvider.supportsTimeframe && !selectedProvider.supportsTimeframe(query.data.timeframe)) {
+      return reply.code(422).send({ error: { code: "TIMEFRAME_UNSUPPORTED", message: "The selected provider does not support this timeframe." } });
+    }
     const normalizedSymbol = symbol.toUpperCase();
     try {
       const candles = await selectedProvider.getCandles(
