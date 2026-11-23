@@ -35,6 +35,7 @@ test("creates named lists and selects them independently by market", () => {
   assert.equal(collection.activeListIds.forex, "forex-list");
   assert.equal(collection.lists.length, 2);
   assert.throws(() => createNamedWatchlist(collection, "crypto", "favorites", "duplicate", 102), /already exists/);
+  assert.throws(() => createNamedWatchlist(collection, "crypto", "Other", "list-1", 102), /ID already exists/);
   collection = selectNamedWatchlist(collection, "crypto", null);
   assert.equal(collection.activeListIds.crypto, null);
   assert.throws(() => selectNamedWatchlist(collection, "crypto", "forex-list"), /does not belong/);
@@ -68,7 +69,7 @@ test("renames and deletes lists without leaving invalid active IDs", () => {
 });
 
 test("watchlist order operations are safe at boundaries and timestamps cannot move backward", () => {
-  let collection = addWatchlistSymbol(createList(), "list-1", "BTCUSDT", 101);
+  const collection = addWatchlistSymbol(createList(), "list-1", "BTCUSDT", 101);
   const unchanged = moveWatchlistSymbol(collection, "list-1", "BTCUSDT", "up", 102);
   assert.equal(unchanged, collection);
   assert.throws(() => renameNamedWatchlist(collection, "list-1", "Renamed", 99), /timestamp/);
@@ -97,13 +98,15 @@ test("watchlist collection rejects invalid active IDs and duplicate symbols", ()
     },
   };
   assert.equal(parseNamedWatchlistCollection(JSON.stringify(invalidActive)), null);
+  const firstItem = collection.lists[0]?.items[0];
+  assert.ok(firstItem);
   const duplicateSymbols = {
     schemaVersion: 1,
     collection: {
       ...collection,
       lists: collection.lists.map((list) => ({
         ...list,
-        items: [...list.items, { ...list.items[0]!, addedAt: 102 }],
+        items: [...list.items, { ...firstItem, addedAt: 102 }],
       })),
     },
   };
