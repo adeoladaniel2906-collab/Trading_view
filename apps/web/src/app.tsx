@@ -262,7 +262,7 @@ export function App() {
         </a>
         <div className="terminal-topbar-meta">
           <span className="terminal-session">MARKET ANALYSIS</span>
-          <span className="terminal-status"><i aria-hidden="true" /> DATA CONNECTION</span>
+          <span className="terminal-status">MARKET DATA</span>
         </div>
         <details className="terminal-tools-menu">
           <summary aria-label="Open additional tools"><span aria-hidden="true">☰</span> Tools</summary>
