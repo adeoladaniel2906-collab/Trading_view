@@ -1,5 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { LiveMarketName, Timeframe } from "@market/contracts";
+import { getBrowserStorage } from "../workspace/workspace-storage";
 import { calculateRiskPlan, type RiskPlanInput, type TradeSide } from "./risk-planner";
+import {
+  cancelPlannedTrade,
+  closePaperTrade,
+  createTradeJournalEntry,
+  openPaperTrade,
+  readTradeJournal,
+  summarizeTradeJournal,
+  updateTradeNotes,
+  upsertTradeJournalEntry,
+  writeTradeJournal,
+  type TradeJournalEntry,
+} from "./trade-journal";
 import "./risk-planner.css";
 
 const INITIAL_INPUT: RiskPlanInput = {
@@ -14,6 +28,12 @@ const INITIAL_INPUT: RiskPlanInput = {
   minimumQuantity: 0.001,
   roundTripFeeRate: 0,
 };
+
+interface RiskPlannerProps {
+  readonly market: LiveMarketName;
+  readonly symbol: string;
+  readonly timeframe: Timeframe;
+}
 
 function NumberField({
   label,
@@ -40,8 +60,13 @@ function NumberField({
   );
 }
 
-export function RiskPlanner() {
+export function RiskPlanner({ market, symbol, timeframe }: RiskPlannerProps) {
   const [input, setInput] = useState<RiskPlanInput>(INITIAL_INPUT);
+  const [journal, setJournal] = useState<TradeJournalEntry[]>(() => readTradeJournal(getBrowserStorage()));
+  const [exitPrices, setExitPrices] = useState<Record<string, string>>({});
+  const [journalError, setJournalError] = useState<string | null>(null);
+  const [journalStorageStatus, setJournalStorageStatus] = useState<"saved" | "unavailable">("saved");
+
   const result = useMemo(() => {
     try {
       const plan = calculateRiskPlan(input);
@@ -54,6 +79,12 @@ export function RiskPlanner() {
     }
   }, [input]);
 
+  useEffect(() => {
+    const saved = writeTradeJournal(getBrowserStorage(), journal);
+    setJournalStorageStatus(saved ? "saved" : "unavailable");
+  }, [journal]);
+
+  const summary = useMemo(() => summarizeTradeJournal(journal, Date.now()), [journal]);
   const update = <K extends keyof RiskPlanInput>(key: K, value: RiskPlanInput[K]) => {
     setInput((current) => ({ ...current, [key]: value }));
   };
@@ -61,6 +92,66 @@ export function RiskPlanner() {
   const format = (value: number) => new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 4,
   }).format(value);
+
+  const savePlan = () => {
+    if (!result.plan) return;
+    try {
+      const entry = createTradeJournalEntry(
+        input,
+        result.plan,
+        { market, symbol, timeframe },
+        crypto.randomUUID(),
+        Date.now(),
+      );
+      setJournal(upsertTradeJournalEntry(journal, entry));
+      setJournalError(null);
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to save this plan.");
+    }
+  };
+
+  const updateEntry = (entry: TradeJournalEntry) => {
+    try {
+      setJournal(upsertTradeJournalEntry(journal, entry));
+      setJournalError(null);
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to update the journal.");
+    }
+  };
+
+  const openEntry = (entry: TradeJournalEntry) => {
+    try {
+      updateEntry(openPaperTrade(entry, Math.max(Date.now(), entry.updatedAt)));
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to open paper trade.");
+    }
+  };
+
+  const cancelEntry = (entry: TradeJournalEntry) => {
+    try {
+      updateEntry(cancelPlannedTrade(entry, Math.max(Date.now(), entry.updatedAt)));
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to cancel the plan.");
+    }
+  };
+
+  const closeEntry = (entry: TradeJournalEntry) => {
+    try {
+      const exitPrice = Number(exitPrices[entry.id] ?? "");
+      updateEntry(closePaperTrade(entry, exitPrice, Math.max(Date.now(), entry.updatedAt)));
+      setExitPrices((current) => ({ ...current, [entry.id]: "" }));
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to close paper trade.");
+    }
+  };
+
+  const changeNotes = (entry: TradeJournalEntry, notes: string) => {
+    try {
+      updateEntry(updateTradeNotes(entry, notes, Math.max(Date.now(), entry.updatedAt)));
+    } catch (cause) {
+      setJournalError(cause instanceof Error ? cause.message : "Unable to update trade notes.");
+    }
+  };
 
   return (
     <section className="risk-planner" aria-labelledby="risk-planner-title">
@@ -101,12 +192,95 @@ export function RiskPlanner() {
           <div><span>Estimated loss at stop</span><strong>{format(result.plan.estimatedLoss)}</strong></div>
           <div><span>Estimated profit at target</span><strong>{format(result.plan.estimatedProfit)}</strong></div>
           <div><span>Reward / risk</span><strong>{format(result.plan.rewardToRisk)} : 1</strong></div>
+          <button className="risk-journal-save" type="button" onClick={savePlan}>
+            Save plan to paper journal
+          </button>
         </div>
       ) : null}
+      {journalError ? <p className="risk-planner-error" role="alert">{journalError}</p> : null}
+
+      <section className="trade-journal" aria-labelledby="trade-journal-title">
+        <div className="trade-journal-heading">
+          <div>
+            <h4 id="trade-journal-title">Paper trade journal</h4>
+            <p>{market.toUpperCase()} · {symbol} · {timeframe} · No broker execution</p>
+          </div>
+          <span>{journal.length} / 500 records</span>
+        </div>
+        <div className="trade-journal-summary" aria-live="polite">
+          <div><span>Planned risk</span><strong>{format(summary.plannedRisk)}</strong></div>
+          <div><span>Open risk</span><strong>{format(summary.openRisk)}</strong></div>
+          <div><span>Realized P&L today</span><strong>{format(summary.realizedPnlToday)}</strong></div>
+          <div><span>Plans today</span><strong>{summary.entriesToday}</strong></div>
+        </div>
+        <p className="trade-journal-storage" role="status">
+          {journalStorageStatus === "saved"
+            ? "Journal saved in this browser"
+            : "Journal storage unavailable or saved data is unsupported; existing data was preserved."}
+        </p>
+        {journal.length === 0 ? (
+          <p className="trade-journal-empty">No saved plans yet. Save a valid risk plan to start your journal.</p>
+        ) : (
+          <div className="trade-journal-list">
+            {journal.map((entry) => (
+              <article className="trade-journal-entry" key={entry.id}>
+                <div className="trade-journal-entry-heading">
+                  <strong>{entry.symbol} · {entry.side.toUpperCase()}</strong>
+                  <span className={`trade-journal-status is-${entry.status}`}>{entry.status}</span>
+                </div>
+                <div className="trade-journal-entry-data">
+                  <span>Qty {format(entry.quantity)}</span>
+                  <span>Entry {format(entry.entryPrice)}</span>
+                  <span>Stop {format(entry.stopPrice)}</span>
+                  <span>Target {format(entry.targetPrice)}</span>
+                  <span>Risk {format(entry.estimatedLoss)}</span>
+                  {entry.status === "closed" ? (
+                    <span>Realized {format(entry.realizedPnl ?? 0)}</span>
+                  ) : null}
+                </div>
+                <label className="trade-journal-notes">
+                  <span>Notes</span>
+                  <textarea
+                    value={entry.notes}
+                    maxLength={2_000}
+                    rows={2}
+                    onChange={(event) => changeNotes(entry, event.currentTarget.value)}
+                  />
+                </label>
+                {entry.status === "planned" ? (
+                  <div className="trade-journal-actions">
+                    <button type="button" onClick={() => openEntry(entry)}>Open paper trade</button>
+                    <button type="button" onClick={() => cancelEntry(entry)}>Cancel plan</button>
+                  </div>
+                ) : null}
+                {entry.status === "open" ? (
+                  <div className="trade-journal-actions">
+                    <label>
+                      <span>Exit price</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={exitPrices[entry.id] ?? ""}
+                        onChange={(event) => setExitPrices((current) => ({
+                          ...current,
+                          [entry.id]: event.currentTarget.value,
+                        }))}
+                      />
+                    </label>
+                    <button type="button" onClick={() => closeEntry(entry)}>Close paper trade</button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <p className="risk-planner-disclaimer">
         Uses the point value and fee rate you enter. Account and quote currencies must match.
         It does not infer leverage, contract specifications, funding, spread, slippage, or broker rules,
-        and it never places an order.
+        and it never places an order. Paper trades are manual records, not simulated broker fills.
       </p>
     </section>
   );
