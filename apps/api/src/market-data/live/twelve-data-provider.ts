@@ -1,7 +1,12 @@
 import WebSocket from "ws";
 import type { Candle, LiveMarketEvent, LiveMarketRequest, Timeframe } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
-import { zonedStartOfDay, zonedStartOfMonth, zonedStartOfWeek } from "../time-zone.js";
+import {
+  TWELVE_DATA_FOREX_TIME_ZONE,
+  zonedStartOfDay,
+  zonedStartOfMonth,
+  zonedStartOfWeek,
+} from "../time-zone.js";
 
 interface TwelveDataMessage {
   readonly event?: unknown;
@@ -20,7 +25,7 @@ interface Channel {
 }
 
 /** Twelve Data's Forex aggregate exchange reports market time in Australia/Sydney. */
-export const FOREX_EXCHANGE_TIME_ZONE = "Australia/Sydney";
+export const FOREX_EXCHANGE_TIME_ZONE = TWELVE_DATA_FOREX_TIME_ZONE;
 
 const intervalSeconds: Partial<Record<Timeframe, number>> = {
   "1s": 1, "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1_800,
