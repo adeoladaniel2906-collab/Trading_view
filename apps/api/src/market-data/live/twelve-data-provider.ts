@@ -62,8 +62,9 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
 
   subscribe(request: LiveMarketRequest, listener: LiveMarketListener): () => void {
     if (request.market !== "forex") throw new Error("Twelve Data live adapter is configured for Forex");
-    if (!/^[A-Z]{3}\/[A-Z]{3}$/.test(request.symbol)) throw new Error("Invalid Forex currency pair");
+    if (!/^[A-Z]{6}$/.test(request.symbol)) throw new Error("Invalid Forex currency pair");
     const symbol = request.symbol.toUpperCase();
+    const providerSymbol = symbol.slice(0, 3) + "/" + symbol.slice(3);
     const key = symbol + ":" + request.timeframe;
     let channel = this.channels.get(key);
     if (!channel) {
@@ -74,7 +75,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
       channel = { request: { ...request, symbol }, listeners: new Set() };
       this.channels.set(key, channel);
       if (!activeSymbols.has(symbol) && this.socket?.readyState === WebSocket.OPEN) {
-        this.send({ action: "subscribe", params: { symbols: symbol } });
+        this.send({ action: "subscribe", params: { symbols: providerSymbol } });
       }
       this.ensureConnected();
     }
@@ -90,7 +91,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
         this.channels.delete(key);
         const stillSubscribed = [...this.channels.values()].some((item) => item.request.symbol === symbol);
         if (!stillSubscribed && this.socket?.readyState === WebSocket.OPEN) {
-          this.send({ action: "unsubscribe", params: { symbols: symbol } });
+          this.send({ action: "unsubscribe", params: { symbols: symbol.slice(0, 3) + "/" + symbol.slice(3) } });
         }
       }
     };
@@ -110,7 +111,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
       this.reconnectDelay = 1_000;
       const symbols = [...new Set([...this.channels.values()].map((item) => item.request.symbol))];
       if (symbols.length) {
-        this.send({ action: "subscribe", params: { symbols: symbols.join(",") } });
+        this.send({ action: "subscribe", params: { symbols: symbols.map((item) => item.slice(0, 3) + "/" + item.slice(3)).join(",") } });
       }
       this.heartbeatTimer = setInterval(() => {
         this.send({ action: "heartbeat" });
@@ -139,7 +140,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
     const message = payload as TwelveDataMessage;
     if (message.event !== "price" || typeof message.symbol !== "string") return;
-    const symbol = message.symbol.toUpperCase();
+    const symbol = message.symbol.toUpperCase().replace("/", "");
     const price = numeric(message.price);
     const timestamp = numeric(message.timestamp);
     if (price === undefined || price <= 0 || timestamp === undefined || timestamp <= 0) return;
