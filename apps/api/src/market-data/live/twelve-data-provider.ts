@@ -32,7 +32,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
   constructor(
     private readonly apiKey: string,
     private readonly socketFactory: (url: string, key: string) => WebSocket =
-      (url, key) => new WebSocket(url, { headers: { "X-TD-APIKEY": key } }),
+      (url, key) => new WebSocket(url, { headers: { "X-TD-APIKEY": key }, maxPayload: 1_000_000 }),
     private readonly maximumSymbols = 8,
   ) {
     if (!apiKey.trim()) throw new Error("Twelve Data API key is required");
