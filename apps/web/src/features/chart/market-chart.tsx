@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   CandlestickSeries,
+  LineSeries,
   ColorType,
   CrosshairMode,
   createChart,
@@ -10,6 +11,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, Timeframe } from "@market/contracts";
+import { exponentialMovingAverage, simpleMovingAverage } from "./indicators";
 import "./market-chart.css";
 
 interface MarketChartProps {
@@ -18,12 +20,16 @@ interface MarketChartProps {
   readonly timeframe: Timeframe;
   readonly chartLabel: string;
   readonly emptyMessage: string;
+  readonly showSma: boolean;
+  readonly showEma: boolean;
 }
 
-export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyMessage }: MarketChartProps) {
+export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyMessage, showSma, showEma }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const latestLiveCandleRef = useRef<Candle | null>(null);
 
   useEffect(() => {
@@ -60,11 +66,30 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
       priceLineVisible: true,
     });
 
+    const smaSeries = chart.addSeries(LineSeries, {
+      color: "#d9f36a",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    const emaSeries = chart.addSeries(LineSeries, {
+      color: "#6aa9f4",
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
     chartRef.current = chart;
     seriesRef.current = series;
+    smaSeriesRef.current = smaSeries;
+    emaSeriesRef.current = emaSeries;
 
     return () => {
       seriesRef.current = null;
+      smaSeriesRef.current = null;
+      emaSeriesRef.current = null;
       chartRef.current = null;
       chart.remove();
     };
@@ -83,6 +108,12 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
         close: candle.close,
       })),
     );
+    smaSeriesRef.current?.setData(showSma
+      ? simpleMovingAverage(candles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
+      : []);
+    emaSeriesRef.current?.setData(showEma
+      ? exponentialMovingAverage(candles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
+      : []);
     const latestLiveCandle = latestLiveCandleRef.current;
     if (latestLiveCandle) {
       series.update({
@@ -97,7 +128,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
     if (candles.length > 0) {
       chartRef.current?.timeScale().fitContent();
     }
-  }, [candles]);
+  }, [candles, showSma, showEma]);
 
   useEffect(() => {
     latestLiveCandleRef.current = liveCandle;
