@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   drawingStorageKey,
   loadDrawingHistory,
+  publishDrawingHistory,
   saveDrawingHistory,
+  subscribeDrawingHistory,
 } from "../src/features/chart/drawing-storage.js";
 import { validateDrawing, type ChartDrawing } from "../src/features/chart/drawings.js";
 import type { KeyValueStorage } from "../src/features/workspace/workspace-storage.js";
@@ -55,6 +57,22 @@ test("drawing persistence rejects malformed and oversized stored payloads safely
   assert.equal(loadDrawingHistory(context, storage).drawings.length, 0);
   storage.setItem(drawingStorageKey(context), "x".repeat(128_001));
   assert.equal(loadDrawingHistory(context, storage).drawings.length, 0);
+});
+
+
+test("live drawing sync is isolated by exact context and supports unsubscribe", () => {
+  const received: string[] = [];
+  const unsubscribe = subscribeDrawingHistory(context, (history, sourcePanelId) => {
+    received.push(`${sourcePanelId}:${history.drawings.length}`);
+  });
+  const state = loadDrawingHistory(context, new MemoryStorage());
+  publishDrawingHistory(otherContext, state, "panel-other");
+  assert.deepEqual(received, []);
+  publishDrawingHistory(context, state, "panel-source");
+  assert.deepEqual(received, ["panel-source:0"]);
+  unsubscribe();
+  publishDrawingHistory(context, state, "panel-source");
+  assert.deepEqual(received, ["panel-source:0"]);
 });
 
 test("drawing persistence enforces the per-context drawing quota", () => {
