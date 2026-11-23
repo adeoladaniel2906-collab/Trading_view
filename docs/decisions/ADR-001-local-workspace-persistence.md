@@ -23,7 +23,7 @@ Do not persist:
 - Live candles, event streams, or transient pointer/drag state.
 - Undo/redo history, which remains an in-memory interaction detail.
 
-Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and known v1-to-v2 and v2-to-v3 migrations: v1 adds newly introduced indicator toggles as disabled; v2 adds validated default indicator parameters. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
+Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and known v1-to-v2, v2-to-v3, and v3-to-v4 migrations: v1 adds newly introduced indicator toggles as disabled; v2 adds validated default indicator parameters; v3 preserves numeric indicator settings and adds validated per-indicator price-source defaults. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
 
 ## Alternatives considered
 

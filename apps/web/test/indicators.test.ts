@@ -7,6 +7,7 @@ import {
   exponentialMovingAverage,
   movingAverageConvergenceDivergence,
   onBalanceVolume,
+  priceFromCandle,
   relativeStrengthIndex,
   simpleMovingAverage,
   stochasticOscillator,
@@ -27,6 +28,53 @@ test("SMA returns rolling averages aligned to candle timestamps", () => {
     { time: 180, value: 2 },
     { time: 240, value: 3 },
   ]);
+});
+
+test("OHLC-derived price sources use their exact documented averages", () => {
+  const candle = { time: 60, open: 1, high: 9, low: 3, close: 7 };
+  assert.equal(priceFromCandle(candle, "open"), 1);
+  assert.equal(priceFromCandle(candle, "high"), 9);
+  assert.equal(priceFromCandle(candle, "low"), 3);
+  assert.equal(priceFromCandle(candle, "close"), 7);
+  assert.equal(priceFromCandle(candle, "hl2"), 6);
+  assert.ok(Math.abs(priceFromCandle(candle, "hlc3") - 19 / 3) < 1e-12);
+  assert.equal(priceFromCandle(candle, "ohlc4"), 5);
+  assert.equal(priceFromCandle(candle, "hlcc4"), 6.5);
+});
+
+test("source-based indicators use the selected OHLC-derived price series", () => {
+  const values = [
+    { time: 60, open: 10, high: 20, low: 5, close: 15, volume: 1 },
+    { time: 120, open: 20, high: 30, low: 10, close: 25, volume: 3 },
+    { time: 180, open: 30, high: 40, low: 20, close: 35, volume: 2 },
+  ];
+  assert.deepEqual(simpleMovingAverage(values, 2, "open"), [
+    { time: 120, value: 15 }, { time: 180, value: 25 },
+  ]);
+  const wma = weightedMovingAverage(values, 2, "open");
+  assert.ok(Math.abs((wma[0]?.value ?? 0) - 50 / 3) < 1e-12);
+  assert.ok(Math.abs((wma[1]?.value ?? 0) - 80 / 3) < 1e-12);
+  assert.deepEqual(volumeWeightedMovingAverage(values, 2, "open"), [
+    { time: 120, value: 17.5 }, { time: 180, value: 24 },
+  ]);
+  assert.deepEqual(exponentialMovingAverage(values, 2, "open"), [
+    { time: 120, value: 15 }, { time: 180, value: 25 },
+  ]);
+  assert.deepEqual(relativeStrengthIndex(values, 1, "open").map((point) => point.value), [100, 100]);
+  const macd = movingAverageConvergenceDivergence(values, 1, 2, 1, "open");
+  assert.deepEqual(macd.map((point) => point.macd), [5, 5]);
+  assert.deepEqual(macd.map((point) => point.signal), [5, 5]);
+  const bands = bollingerBands(values, 2, 2, "open");
+  assert.equal(bands[0]?.middle, 15);
+  assert.equal(bands[0]?.upper, 25);
+  assert.equal(bands[0]?.lower, 5);
+  const stochastic = stochasticOscillator(values, 2, 1, "open");
+  assert.ok(Math.abs((stochastic[0]?.k ?? 0) - 60) < 1e-12);
+  assert.ok(Math.abs((stochastic[1]?.k ?? 0) - (200 / 3)) < 1e-12);
+  const vwap = volumeWeightedAveragePrice(values, "open");
+  assert.equal(vwap[0]?.value, 10);
+  assert.equal(vwap[1]?.value, 17.5);
+  assert.ok(Math.abs((vwap[2]?.value ?? 0) - (130 / 6)) < 1e-12);
 });
 
 test("WMA gives the newest close the highest linear weight", () => {

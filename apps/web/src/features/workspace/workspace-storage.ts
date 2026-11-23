@@ -11,7 +11,7 @@ import {
 } from "./workspace-model";
 
 export const WORKSPACE_STORAGE_KEY = "market-workspace.snapshot.v1";
-export const WORKSPACE_STORAGE_VERSION = 3 as const;
+export const WORKSPACE_STORAGE_VERSION = 4 as const;
 export const MAX_WORKSPACE_STORAGE_CHARS = 256_000;
 export const MAX_WATCHLIST_SYMBOLS = 100;
 
@@ -55,7 +55,7 @@ function parseWatchlist(value: unknown, market: LiveMarketName): string[] {
   return symbols;
 }
 
-function parseWorkspace(value: unknown, storedVersion: 1 | 2 | 3): WorkspaceState {
+function parseWorkspace(value: unknown, storedVersion: 1 | 2 | 3 | 4): WorkspaceState {
   if (!isRecord(value) || !LAYOUTS.has(value.layout as number)) {
     throw new TypeError("Saved workspace layout is invalid");
   }
@@ -100,6 +100,23 @@ function parseWorkspace(value: unknown, storedVersion: 1 | 2 | 3): WorkspaceStat
     ) as Record<IndicatorId, boolean>;
     let indicatorParameters: IndicatorParameters = DEFAULT_INDICATOR_PARAMETERS;
     if (storedVersion === 3) {
+      const legacyKeys = [
+        "smaPeriod", "emaPeriod", "wmaPeriod", "vwmaPeriod", "rsiPeriod",
+        "macdFastPeriod", "macdSlowPeriod", "macdSignalPeriod",
+        "bollingerPeriod", "bollingerMultiplier", "atrPeriod",
+        "stochasticPeriod", "stochasticSignalPeriod",
+      ];
+      if (!isRecord(rawPanel.indicatorParameters) ||
+        Object.keys(rawPanel.indicatorParameters).length !== legacyKeys.length ||
+        Object.keys(rawPanel.indicatorParameters).some((key) => !legacyKeys.includes(key))) {
+        throw new TypeError("Saved legacy indicator parameters are invalid");
+      }
+      const upgraded = { ...DEFAULT_INDICATOR_PARAMETERS, ...rawPanel.indicatorParameters };
+      if (!isValidIndicatorParameters(upgraded)) {
+        throw new TypeError("Saved legacy indicator parameters are invalid");
+      }
+      indicatorParameters = upgraded;
+    } else if (storedVersion === 4) {
       if (!isValidIndicatorParameters(rawPanel.indicatorParameters)) {
         throw new TypeError("Saved indicator parameters are invalid");
       }
@@ -146,9 +163,9 @@ export function parsePersistedWorkspace(serialized: string | null): PersistedWor
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed) ||
-      (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2 && parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION) ||
+      (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2 && parsed.schemaVersion !== 3 && parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION) ||
       !isRecord(parsed.watchlists)) return null;
-    const storedVersion = parsed.schemaVersion as 1 | 2 | 3;
+    const storedVersion = parsed.schemaVersion as 1 | 2 | 3 | 4;
     const workspace = parseWorkspace(parsed.workspace, storedVersion);
     const watchlists = {
       crypto: parseWatchlist(parsed.watchlists.crypto, "crypto"),

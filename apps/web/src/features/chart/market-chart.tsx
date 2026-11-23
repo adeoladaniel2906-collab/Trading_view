@@ -393,12 +393,12 @@ export function MarketChart({
         group = createGroup(id);
         indicatorSeriesRef.current.set(id, group);
       }
-      if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, indicatorParameters.smaPeriod));
-      if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, indicatorParameters.emaPeriod));
-      if (id === "wma") setLine(group.lines[0], weightedMovingAverage(data, indicatorParameters.wmaPeriod));
-      if (id === "vwma") setLine(group.lines[0], volumeWeightedMovingAverage(data, indicatorParameters.vwmaPeriod));
+      if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, indicatorParameters.smaPeriod, indicatorParameters.smaSource));
+      if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, indicatorParameters.emaPeriod, indicatorParameters.emaSource));
+      if (id === "wma") setLine(group.lines[0], weightedMovingAverage(data, indicatorParameters.wmaPeriod, indicatorParameters.wmaSource));
+      if (id === "vwma") setLine(group.lines[0], volumeWeightedMovingAverage(data, indicatorParameters.vwmaPeriod, indicatorParameters.vwmaSource));
       if (id === "bollinger") {
-        const points = bollingerBands(data, indicatorParameters.bollingerPeriod, indicatorParameters.bollingerMultiplier);
+        const points = bollingerBands(data, indicatorParameters.bollingerPeriod, indicatorParameters.bollingerMultiplier, indicatorParameters.bollingerSource);
         const upper = points.map((point) => ({ time: point.time, value: point.upper }));
         const middle = points.map((point) => ({ time: point.time, value: point.middle }));
         const lower = points.map((point) => ({ time: point.time, value: point.lower }));
@@ -406,17 +406,17 @@ export function MarketChart({
         setLine(group.lines[1], middle);
         setLine(group.lines[2], lower);
       }
-      if (id === "vwap") setLine(group.lines[0], volumeWeightedAveragePrice(data));
-      if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, indicatorParameters.rsiPeriod));
+      if (id === "vwap") setLine(group.lines[0], volumeWeightedAveragePrice(data, indicatorParameters.vwapSource));
+      if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, indicatorParameters.rsiPeriod, indicatorParameters.rsiSource));
       if (id === "atr") setLine(group.lines[0], averageTrueRange(data, indicatorParameters.atrPeriod));
       if (id === "stochastic") {
-        const points = stochasticOscillator(data, indicatorParameters.stochasticPeriod, indicatorParameters.stochasticSignalPeriod);
+        const points = stochasticOscillator(data, indicatorParameters.stochasticPeriod, indicatorParameters.stochasticSignalPeriod, indicatorParameters.stochasticSource);
         setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.k })));
         setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.d })));
       }
       if (id === "obv") setLine(group.lines[0], onBalanceVolume(data));
       if (id === "macd") {
-        const points = movingAverageConvergenceDivergence(data, indicatorParameters.macdFastPeriod, indicatorParameters.macdSlowPeriod, indicatorParameters.macdSignalPeriod);
+        const points = movingAverageConvergenceDivergence(data, indicatorParameters.macdFastPeriod, indicatorParameters.macdSlowPeriod, indicatorParameters.macdSignalPeriod, indicatorParameters.macdSource);
         setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.macd })));
         setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.signal })));
         group.histograms[0]?.setData(points.map((point) => ({

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import type { LiveMarketName, Timeframe } from "@market/contracts";
-import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
+import { INDICATOR_CATALOG, type IndicatorId, type PriceSource } from "../chart/indicators";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
 import {
   SUPPORTED_SYMBOLS,
   SUPPORTED_TIMEFRAMES,
   type ChartPanelState,
   type IndicatorParameterKey,
+  type IndicatorParameterValue,
+  type IndicatorSourceKey,
   type PanelSelection,
 } from "../workspace/workspace-model";
 import { useMarketData } from "../market-data/use-market-data";
@@ -40,7 +42,7 @@ interface ChartPanelProps {
   readonly onActivate: () => void;
   readonly onSelectionChange: (selection: PanelSelection) => void;
   readonly onIndicatorChange: (indicator: IndicatorId, enabled: boolean) => void;
-  readonly onIndicatorParameterChange: (parameter: IndicatorParameterKey, value: number) => void;
+  readonly onIndicatorParameterChange: (parameter: IndicatorParameterKey, value: IndicatorParameterValue) => void;
   readonly onChartTypeChange: (chartType: ChartType) => void;
   readonly compact: boolean;
 }
@@ -131,6 +133,26 @@ export function ChartPanel({
     </label>
   );
 
+  const renderSource = (label: string, parameter: IndicatorSourceKey) => (
+    <label key={parameter}>
+      <span>{label} source</span>
+      <select
+        aria-label={`${label} source for ${panel.id}`}
+        value={panel.indicatorParameters[parameter]}
+        onChange={(event) => onIndicatorParameterChange(parameter, event.currentTarget.value as PriceSource)}
+      >
+        <option value="open">Open</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+        <option value="close">Close</option>
+        <option value="hl2">HL2</option>
+        <option value="hlc3">HLC3</option>
+        <option value="ohlc4">OHLC4</option>
+        <option value="hlcc4">HLCC4</option>
+      </select>
+    </label>
+  );
+
   return (
     <section
       className={active ? "chart-panel is-active" : "chart-panel"}
@@ -216,24 +238,36 @@ export function ChartPanel({
               <fieldset>
                 <legend>Moving averages</legend>
                 {renderParameter("SMA period", "smaPeriod", 1, 500)}
+                {renderSource("SMA", "smaSource")}
                 {renderParameter("EMA period", "emaPeriod", 1, 500)}
+                {renderSource("EMA", "emaSource")}
                 {renderParameter("WMA period", "wmaPeriod", 1, 500)}
+                {renderSource("WMA", "wmaSource")}
                 {renderParameter("VWMA period", "vwmaPeriod", 1, 500)}
+                {renderSource("VWMA", "vwmaSource")}
               </fieldset>
               <fieldset>
                 <legend>Oscillators</legend>
                 {renderParameter("RSI period", "rsiPeriod", 1, 500)}
+                {renderSource("RSI", "rsiSource")}
                 {renderParameter("MACD fast", "macdFastPeriod", 1, panel.indicatorParameters.macdSlowPeriod - 1)}
                 {renderParameter("MACD slow", "macdSlowPeriod", panel.indicatorParameters.macdFastPeriod + 1, 500)}
                 {renderParameter("MACD signal", "macdSignalPeriod", 1, 50)}
+                {renderSource("MACD", "macdSource")}
                 {renderParameter("ATR period", "atrPeriod", 1, 500)}
                 {renderParameter("Stochastic period", "stochasticPeriod", 1, 500)}
                 {renderParameter("Stochastic signal", "stochasticSignalPeriod", 1, 50)}
+                {renderSource("Stochastic", "stochasticSource")}
               </fieldset>
               <fieldset>
                 <legend>Bollinger Bands</legend>
                 {renderParameter("Band period", "bollingerPeriod", 1, 500)}
                 {renderParameter("Deviation multiplier", "bollingerMultiplier", 0.1, 10, 0.1)}
+                {renderSource("Bollinger", "bollingerSource")}
+              </fieldset>
+              <fieldset>
+                <legend>Volume</legend>
+                {renderSource("VWAP", "vwapSource")}
               </fieldset>
             </div>
           </details>
