@@ -11,7 +11,9 @@ import {
 } from "../src/features/workspace/workspace-storage.js";
 import {
   createWorkspaceState,
+  DEFAULT_INDICATOR_PARAMETERS,
   resizeWorkspace,
+  updatePanelIndicatorParameter,
   updatePanelChartType,
   updatePanelIndicator,
   updatePanelSelection,
@@ -52,10 +54,11 @@ function fixture() {
 test("workspace and watchlists round-trip with independent panel settings", () => {
   const storage = new MemoryStorage();
   const input = fixture();
-  assert.equal(writePersistedWorkspace(storage, input.workspace, input.watchlists), true);
+  const workspace = updatePanelIndicatorParameter(input.workspace, "panel-2", "rsiPeriod", 21);
+  assert.equal(writePersistedWorkspace(storage, workspace, input.watchlists), true);
   assert.ok(storage.values.has(WORKSPACE_STORAGE_KEY));
   const loaded = readPersistedWorkspace(storage);
-  assert.deepEqual(loaded?.workspace, input.workspace);
+  assert.deepEqual(loaded?.workspace, workspace);
   assert.deepEqual(loaded?.watchlists, input.watchlists);
 });
 
@@ -85,7 +88,7 @@ test("known version-one workspace snapshots migrate with new indicators disabled
   assert.equal(migrated?.workspace.panels[0]?.indicators.wma, false);
   assert.equal(migrated?.workspace.panels[0]?.indicators.stochastic, false);
   assert.equal(migrated?.workspace.panels[0]?.indicators.obv, false);
-  assert.deepEqual(migrated?.workspace.panels[0]?.indicatorParameters, input.workspace.panels[0]?.indicatorParameters);
+  assert.deepEqual(migrated?.workspace.panels[0]?.indicatorParameters, DEFAULT_INDICATOR_PARAMETERS);
 });
 
 test("known version-two snapshots migrate with default indicator parameters", () => {
@@ -107,7 +110,7 @@ test("known version-two snapshots migrate with default indicator parameters", ()
     watchlists: input.watchlists,
   }));
   assert.equal(migrated?.schemaVersion, WORKSPACE_STORAGE_VERSION);
-  assert.deepEqual(migrated?.workspace.panels[0]?.indicatorParameters, input.workspace.panels[0]?.indicatorParameters);
+  assert.deepEqual(migrated?.workspace.panels[0]?.indicatorParameters, DEFAULT_INDICATOR_PARAMETERS);
 });
 
 test("parser rejects invalid panel identity, unsupported symbols and duplicate watchlist entries", () => {
