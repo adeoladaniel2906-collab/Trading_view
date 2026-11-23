@@ -236,7 +236,7 @@ This section records what is actually merged or under review. A roadmap item is 
 
 | Workstream | Verified status | Remaining Phase B work |
 |---|---|---|
-| B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, and symbol/timeframe synchronization are merged. | Crosshair and drawing synchronization; browser/mobile regression suite. |
+| B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, symbol/timeframe synchronization and time-aligned crosshair synchronization are merged. | Drawing synchronization; browser/mobile regression suite. |
 | B2 Drawings | Six core drawing tools, object management, edit/rename/lock/hide/delete, snapping, undo/redo, and browser-local context-isolated persistence are merged. | Channels and advanced tools; full pointer/touch regression coverage; stronger viewport and multi-panel sync tests. |
 | B3 Indicators | Eleven core indicators are merged with editable per-panel periods, multipliers and OHLC-derived price sources. Workspace snapshots migrate through v4. | Saved indicator templates, independent reference fixtures, browser pane regression, and the 400+ built-in indicator/strategy catalogue remain. |
 | B4 Trading assistance | Non-executing risk planner with conservative quantity precision, local manual paper journal, planned/open/closed/cancelled lifecycle and basic risk summary are merged. | Instrument-aware pip/tick/contract value and fee assumptions; journal templates; strategy checklist; broader daily risk dashboard. |
@@ -246,3 +246,8 @@ This section records what is actually merged or under review. A roadmap item is 
 ### Persistence boundary
 
 Workspace, watchlist and drawing persistence currently belongs to the browser profile. It does not provide account identity, cloud synchronization, or cross-device recovery. Server-side alerts and shared user records remain blocked until authentication, database ownership, retention and backup decisions are implemented. Browser timers are not a substitute for persistent server-side alert evaluation.
+
+
+### Phase A data-alignment note
+
+Twelve Data daily, weekly and monthly Forex timestamps are interpreted using the provider-reported `Australia/Sydney` exchange timezone, including daylight-saving transitions. Missing or mismatched exchange-timezone metadata fails closed. This aligns candle boundaries; it does not supply a holiday/session calendar, so gap completeness must still remain degraded when that calendar is unavailable.
