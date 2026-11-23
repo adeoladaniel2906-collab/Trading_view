@@ -87,7 +87,7 @@ export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
 
   return (
     <div className="market-chart-shell">
-      <div ref={containerRef} className="market-chart-canvas" aria-label="Market candlestick chart" />
+      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label="Market candlestick chart" />
       {candles.length === 0 ? (
         <div className="market-chart-empty" role="status">
           <span className="market-chart-empty-title">Chart engine ready</span>
