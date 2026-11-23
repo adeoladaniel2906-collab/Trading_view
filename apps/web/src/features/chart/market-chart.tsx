@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
-  CandlestickSeries,
-  ColorType,
-  CrosshairMode,
-  LineSeries,
-  LineStyle,
-  createChart,
-  type IChartApi,
-  type IPriceLine,
-  type ISeriesApi,
-  type MouseEventParams,
-  type Time,
-  type UTCTimestamp,
+  CandlestickSeries, ColorType, CrosshairMode, LineSeries, createChart,
+  type IChartApi, type ISeriesApi, type MouseEventParams, type Time, type UTCTimestamp,
 } from "lightweight-charts";
-import type { Candle, Timeframe } from "@market/contracts";
+import type { Candle, LiveMarketName, Timeframe } from "@market/contracts";
+import {
+  DRAWING_COLORS, applyDrawingCommand, createDrawingHistory, redoDrawing, undoDrawing,
+  type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind,
+} from "./drawings";
 import { exponentialMovingAverage, simpleMovingAverage } from "./indicators";
 import "./market-chart.css";
 
@@ -21,182 +15,162 @@ interface MarketChartProps {
   readonly candles: readonly Candle[];
   readonly liveCandle: Candle | null;
   readonly timeframe: Timeframe;
+  readonly market: LiveMarketName;
+  readonly symbol: string;
   readonly chartLabel: string;
   readonly emptyMessage: string;
   readonly showSma: boolean;
   readonly showEma: boolean;
   readonly compact?: boolean;
 }
+type DrawingMode = "none" | DrawingKind;
+interface ChartPoint { readonly x: number; readonly y: number; }
+const DEFAULT_STYLE = { color: DRAWING_COLORS[0], lineWidth: 2 as const, lineStyle: "solid" as const };
 
-type DrawingMode = "none" | "horizontal" | "trendline";
-type TrendPoint = { readonly time: number; readonly value: number };
-type DrawingRecord =
-  | { readonly kind: "horizontal"; readonly price: number }
-  | { readonly kind: "trendline"; readonly points: readonly [TrendPoint, TrendPoint] };
-type RenderedDrawing = {
-  readonly record: DrawingRecord;
-  readonly priceLine?: IPriceLine;
-  readonly series?: ISeriesApi<"Line">;
-};
+function contextKey(market: LiveMarketName, symbol: string, timeframe: Timeframe): string {
+  return `${market}:${symbol}:${timeframe}`;
+}
+function pointForAnchor(chart: IChartApi, series: ISeriesApi<"Candlestick">, anchor: DrawingAnchor): ChartPoint | null {
+  const x = chart.timeScale().timeToCoordinate(anchor.time as UTCTimestamp as Time);
+  const y = series.priceToCoordinate(anchor.price);
+  return x === null || y === null ? null : { x, y };
+}
+function dashFor(style: ChartDrawing["style"]["lineStyle"]): string | undefined {
+  return style === "dashed" ? "7 5" : style === "dotted" ? "2 4" : undefined;
+}
+function measurementLabel(drawing: ChartDrawing): string {
+  const first = drawing.anchors[0];
+  const second = drawing.anchors[1];
+  if (!first || !second) return drawing.label;
+  const delta = second.price - first.price;
+  const percent = (delta / first.price) * 100;
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${delta.toPrecision(5)} (${sign}${percent.toFixed(2)}%) · ${Math.round(Math.abs(second.time - first.time) / 60)}m`;
+}
 
 export function MarketChart({
-  candles,
-  liveCandle,
-  timeframe,
-  chartLabel,
-  emptyMessage,
-  showSma,
-  showEma,
-  compact = false,
+  candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
+  showSma, showEma, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const drawingsRef = useRef<RenderedDrawing[]>([]);
-  const redoRef = useRef<DrawingRecord[]>([]);
-  const pendingTrendPointRef = useRef<TrendPoint | null>(null);
-  const [drawingMode, setDrawingMode] = useState<DrawingMode>("none");
-  const [drawingCount, setDrawingCount] = useState(0);
-  const [redoCount, setRedoCount] = useState(0);
-  const [trendPointPending, setTrendPointPending] = useState(false);
+  const historiesRef = useRef(new Map<string, DrawingHistoryState>());
+  const [history, setHistory] = useState<DrawingHistoryState>(() => createDrawingHistory());
+  const [mode, setMode] = useState<DrawingMode>("none");
+  const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [treeOpen, setTreeOpen] = useState(true);
+  const [viewportRevision, setViewportRevision] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: compact ? 320 : 420 });
+  const activeKey = contextKey(market, symbol, timeframe);
 
-  const renderDrawing = useCallback((record: DrawingRecord): RenderedDrawing | null => {
-    const chart = chartRef.current;
-    const candleSeries = candleSeriesRef.current;
-    if (!chart || !candleSeries) return null;
+  useEffect(() => {
+    const current = historiesRef.current.get(activeKey) ?? createDrawingHistory();
+    historiesRef.current.set(activeKey, current);
+    setHistory(current);
+    setSelectedId(null);
+    setPendingAnchor(null);
+    setMode("none");
+  }, [activeKey]);
 
-    if (record.kind === "horizontal") {
-      const priceLine = candleSeries.createPriceLine({
-        price: record.price,
-        color: "#d9f36a",
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: "Level",
-      });
-      return { record, priceLine };
-    }
-
-    const series = chart.addSeries(LineSeries, {
-      color: "#a9b4c3",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
+  const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
+    setHistory((current) => {
+      const next = applyDrawingCommand(current, command);
+      historiesRef.current.set(activeKey, next);
+      return next;
     });
-    const points = [...record.points].sort((left, right) => left.time - right.time);
-    series.setData(points.map((point) => ({
-      time: point.time as UTCTimestamp as Time,
-      value: point.value,
-    })));
-    return { record, series };
-  }, []);
+  }, [activeKey]);
 
-  const removeDrawing = (drawing: RenderedDrawing) => {
-    const chart = chartRef.current;
-    const candleSeries = candleSeriesRef.current;
-    if (drawing.priceLine && candleSeries) candleSeries.removePriceLine(drawing.priceLine);
-    if (drawing.series && chart) chart.removeSeries(drawing.series);
-  };
+  const commitHistory = useCallback((transform: (current: DrawingHistoryState) => DrawingHistoryState) => {
+    setHistory((current) => {
+      const next = transform(current);
+      historiesRef.current.set(activeKey, next);
+      return next;
+    });
+  }, [activeKey]);
+
+  const addDrawing = useCallback((kind: DrawingKind, first: DrawingAnchor, second?: DrawingAnchor) => {
+    const drawing: ChartDrawing = {
+      schemaVersion: 1,
+      id: crypto.randomUUID(),
+      context: { market, symbol, timeframe },
+      kind,
+      anchors: second ? [first, second] : [first],
+      style: DEFAULT_STYLE,
+      visible: true,
+      locked: false,
+      label: kind.charAt(0).toUpperCase() + kind.slice(1),
+    };
+    commit({ type: "add", drawing });
+    setSelectedId(drawing.id);
+  }, [commit, market, symbol, timeframe]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
     const chart = createChart(container, {
       autoSize: true,
-      layout: {
-        background: { type: ColorType.Solid, color: "#151c26" },
-        textColor: "#94a0b1",
-        attributionLogo: true,
-      },
-      grid: {
-        vertLines: { color: "#25303d" },
-        horzLines: { color: "#25303d" },
-      },
+      layout: { background: { type: ColorType.Solid, color: "#151c26" }, textColor: "#94a0b1", attributionLogo: true },
+      grid: { vertLines: { color: "#25303d" }, horzLines: { color: "#25303d" } },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: "#344253" },
-      timeScale: {
-        borderColor: "#344253",
-        timeVisible: true,
-        secondsVisible: false,
-      },
+      timeScale: { borderColor: "#344253", timeVisible: true, secondsVisible: false },
       localization: { locale: "en-US" },
     });
-
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderVisible: false,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-      priceLineVisible: true,
+      upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
+      wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
     });
     smaSeriesRef.current = chart.addSeries(LineSeries, {
-      color: "#d9f36a",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
+      color: "#d9f36a", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
     emaSeriesRef.current = chart.addSeries(LineSeries, {
-      color: "#a9b4c3",
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
+      color: "#a9b4c3", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
     chartRef.current = chart;
-
+    const refresh = () => setViewportRevision((value) => value + 1);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(refresh);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+      refresh();
+    });
+    observer.observe(container);
     return () => {
+      observer.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(refresh);
       chartRef.current = null;
       candleSeriesRef.current = null;
       smaSeriesRef.current = null;
       emaSeriesRef.current = null;
-      drawingsRef.current = [];
-      redoRef.current = [];
-      pendingTrendPointRef.current = null;
       chart.remove();
     };
   }, []);
 
   useEffect(() => {
-    const candleSeries = candleSeriesRef.current;
-    if (!candleSeries) return;
-    candleSeries.setData(
-      candles.map((candle) => ({
-        time: candle.time as UTCTimestamp as Time,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-      })),
-    );
-    if (candles.length > 0) chartRef.current?.timeScale().fitContent();
+    const series = candleSeriesRef.current;
+    if (!series) return;
+    series.setData(candles.map((candle) => ({
+      time: candle.time as UTCTimestamp as Time,
+      open: candle.open, high: candle.high, low: candle.low, close: candle.close,
+    })));
+    if (candles.length) chartRef.current?.timeScale().fitContent();
   }, [candles]);
 
   useEffect(() => {
     const byTime = new Map(candles.map((candle) => [candle.time, candle]));
     if (liveCandle) byTime.set(liveCandle.time, liveCandle);
-    const indicatorCandles = [...byTime.values()].sort((left, right) => left.time - right.time);
-    smaSeriesRef.current?.setData(
-      showSma
-        ? simpleMovingAverage(indicatorCandles, 20).map((point) => ({
-            time: point.time as UTCTimestamp as Time,
-            value: point.value,
-          }))
-        : [],
-    );
-    emaSeriesRef.current?.setData(
-      showEma
-        ? exponentialMovingAverage(indicatorCandles, 20).map((point) => ({
-            time: point.time as UTCTimestamp as Time,
-            value: point.value,
-          }))
-        : [],
-    );
+    const data = [...byTime.values()].sort((a, b) => a.time - b.time);
+    smaSeriesRef.current?.setData(showSma ? simpleMovingAverage(data, 20).map((point) => ({
+      time: point.time as UTCTimestamp as Time, value: point.value,
+    })) : []);
+    emaSeriesRef.current?.setData(showEma ? exponentialMovingAverage(data, 20).map((point) => ({
+      time: point.time as UTCTimestamp as Time, value: point.value,
+    })) : []);
   }, [candles, liveCandle, showSma, showEma]);
 
   useEffect(() => {
@@ -207,129 +181,155 @@ export function MarketChart({
     if (!liveCandle) return;
     candleSeriesRef.current?.update({
       time: liveCandle.time as UTCTimestamp as Time,
-      open: liveCandle.open,
-      high: liveCandle.high,
-      low: liveCandle.low,
-      close: liveCandle.close,
+      open: liveCandle.open, high: liveCandle.high, low: liveCandle.low, close: liveCandle.close,
     });
   }, [liveCandle]);
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || drawingMode === "none") return;
+    if (!chart || mode === "none") return;
     const handleClick = (event: MouseEventParams<Time>) => {
       if (!event.point) return;
-      const candleSeries = candleSeriesRef.current;
-      if (!candleSeries) return;
-      const price = candleSeries.coordinateToPrice(event.point.y);
+      const series = candleSeriesRef.current;
+      if (!series) return;
+      const price = series.coordinateToPrice(event.point.y);
       const time = chart.timeScale().coordinateToTime(event.point.x);
-      if (price === null || typeof time !== "number") return;
-
-      if (drawingMode === "horizontal") {
-        const record: DrawingRecord = { kind: "horizontal", price };
-        const rendered = renderDrawing(record);
-        if (rendered) {
-          drawingsRef.current.push(rendered);
-          redoRef.current = [];
-          setDrawingCount(drawingsRef.current.length);
-          setRedoCount(0);
-        }
-        setDrawingMode("none");
+      if (price === null || typeof time !== "number" || !Number.isFinite(price)) return;
+      const anchor = { time, price };
+      if (mode === "horizontal" || mode === "vertical") {
+        addDrawing(mode, anchor);
+        setMode("none");
         return;
       }
-
-      const point: TrendPoint = { time, value: price };
-      const firstPoint = pendingTrendPointRef.current;
-      if (!firstPoint) {
-        pendingTrendPointRef.current = point;
-        setTrendPointPending(true);
-        return;
-      }
-      if (firstPoint.time === point.time) return;
-      const record: DrawingRecord = {
-        kind: "trendline",
-        points: [firstPoint, point],
-      };
-      const rendered = renderDrawing(record);
-      if (rendered) {
-        drawingsRef.current.push(rendered);
-        redoRef.current = [];
-        setDrawingCount(drawingsRef.current.length);
-        setRedoCount(0);
-      }
-      pendingTrendPointRef.current = null;
-      setTrendPointPending(false);
-      setDrawingMode("none");
+      if (!pendingAnchor) { setPendingAnchor(anchor); return; }
+      if ((mode === "trendline" || mode === "ray") && pendingAnchor.time === anchor.time) return;
+      if (mode === "rectangle" && (pendingAnchor.time === anchor.time || pendingAnchor.price === anchor.price)) return;
+      if (pendingAnchor.time === anchor.time && pendingAnchor.price === anchor.price) return;
+      addDrawing(mode, pendingAnchor, anchor);
+      setPendingAnchor(null);
+      setMode("none");
     };
     chart.subscribeClick(handleClick);
     return () => chart.unsubscribeClick(handleClick);
-  }, [drawingMode, renderDrawing]);
+  }, [mode, pendingAnchor, addDrawing]);
 
-  const undoDrawing = () => {
-    const drawing = drawingsRef.current.pop();
-    if (!drawing) return;
-    removeDrawing(drawing);
-    redoRef.current.push(drawing.record);
-    setDrawingCount(drawingsRef.current.length);
-    setRedoCount(redoRef.current.length);
-  };
+  const undo = useCallback(() => { commitHistory(undoDrawing); setSelectedId(null); }, [commitHistory]);
+  const redo = useCallback(() => { commitHistory(redoDrawing); setSelectedId(null); }, [commitHistory]);
+  const cancel = useCallback(() => { setPendingAnchor(null); setMode("none"); }, []);
 
-  const redoDrawing = () => {
-    const record = redoRef.current.pop();
-    if (!record) return;
-    const drawing = renderDrawing(record);
-    if (!drawing) return;
-    drawingsRef.current.push(drawing);
-    setDrawingCount(drawingsRef.current.length);
-    setRedoCount(redoRef.current.length);
-  };
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement &&
+        (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo(); else undo();
+      } else if (modifier && event.key.toLowerCase() === "y") {
+        event.preventDefault(); redo();
+      } else if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
+        const selected = history.drawings.find((item) => item.id === selectedId);
+        if (selected && !selected.locked) {
+          event.preventDefault(); commit({ type: "delete", id: selectedId }); setSelectedId(null);
+        }
+      } else if (event.key === "Escape") { cancel(); setSelectedId(null); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [history, selectedId, commit, redo, undo, cancel]);
 
-  const cancelDrawing = () => {
-    pendingTrendPointRef.current = null;
-    setTrendPointPending(false);
-    setDrawingMode("none");
+  const chart = chartRef.current;
+  const series = candleSeriesRef.current;
+  const renderShape = (drawing: ChartDrawing) => {
+    if (!drawing.visible || !chart || !series) return null;
+    const first = drawing.anchors[0];
+    if (!first) return null;
+    const start = pointForAnchor(chart, series, first);
+    if (!start) return null;
+    const second = drawing.anchors[1];
+    const end = second ? pointForAnchor(chart, series, second) : null;
+    const selected = selectedId === drawing.id;
+    const strokeWidth = drawing.style.lineWidth + (selected ? 1 : 0);
+    const common = { stroke: drawing.style.color, strokeWidth, strokeDasharray: dashFor(drawing.style.lineStyle),
+      pointerEvents: "stroke" as const, onClick: (event: ReactMouseEvent<SVGElement>) => {
+        event.stopPropagation(); setSelectedId(drawing.id);
+      } };
+    if (drawing.kind === "horizontal") return <line key={drawing.id} x1="0" y1={start.y} x2={size.width} y2={start.y} {...common} />;
+    if (drawing.kind === "vertical") return <line key={drawing.id} x1={start.x} y1="0" x2={start.x} y2={size.height} {...common} />;
+    if (!second || !end) return null;
+    if (drawing.kind === "rectangle") return <rect key={drawing.id}
+      x={Math.min(start.x, end.x)} y={Math.min(start.y, end.y)}
+      width={Math.abs(end.x - start.x)} height={Math.abs(end.y - start.y)}
+      fill="transparent" {...common} />;
+    if (drawing.kind === "ray") {
+      const dx = end.x - start.x;
+      if (!dx) return null;
+      const edgeX = dx > 0 ? size.width : 0;
+      const edgeY = start.y + ((edgeX - start.x) / dx) * (end.y - start.y);
+      return <line key={drawing.id} x1={start.x} y1={start.y} x2={edgeX} y2={edgeY} {...common} />;
+    }
+    return <g key={drawing.id}>
+      <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} {...common} />
+      {drawing.kind === "measurement" ? <text x={(start.x + end.x) / 2 + 8}
+        y={(start.y + end.y) / 2 - 8} fill={drawing.style.color} fontSize="11" pointerEvents="none">
+        {measurementLabel(drawing)}
+      </text> : null}
+    </g>;
   };
 
   return (
     <div className={compact ? "market-chart-shell is-compact" : "market-chart-shell"}>
       <div className="drawing-toolbar" role="toolbar" aria-label="Chart drawing tools">
-        <button type="button" onClick={() => setDrawingMode("horizontal")} aria-pressed={drawingMode === "horizontal"}>
-          Horizontal level
-        </button>
-        <button type="button" onClick={() => { pendingTrendPointRef.current = null; setTrendPointPending(false); setDrawingMode("trendline"); }} aria-pressed={drawingMode === "trendline"}>
-          Trend line
-        </button>
-        <button type="button" onClick={undoDrawing} disabled={drawingCount === 0} aria-label="Undo drawing">
-          Undo
-        </button>
-        <button type="button" onClick={redoDrawing} disabled={redoCount === 0} aria-label="Redo drawing">
-          Redo
-        </button>
-        {drawingMode !== "none" ? (
-          <button type="button" onClick={cancelDrawing}>Cancel drawing</button>
-        ) : null}
+        {(["horizontal", "vertical", "trendline", "ray", "rectangle", "measurement"] as const).map((tool) => (
+          <button key={tool} type="button" onClick={() => { setPendingAnchor(null); setMode(tool); }}
+            aria-pressed={mode === tool}>{tool === "trendline" ? "Trend line" : tool === "measurement" ? "Measure" : tool}</button>
+        ))}
+        <button type="button" onClick={undo} disabled={!history.undoStack.length} aria-label="Undo drawing">Undo</button>
+        <button type="button" onClick={redo} disabled={!history.redoStack.length} aria-label="Redo drawing">Redo</button>
+        {mode !== "none" ? <button type="button" onClick={cancel}>Cancel</button> : null}
         <span className="drawing-hint" aria-live="polite">
-          {drawingMode === "horizontal"
-            ? "Click the chart to place a horizontal level."
-            : drawingMode === "trendline"
-              ? trendPointPending
-                ? "Click a second point to finish the trend line."
-                : "Click two points on the chart to draw a trend line."
-              : "Drawings are local to this chart session."}
+          {mode === "none" ? "Drawings are scoped to this symbol and timeframe in this session."
+            : mode === "horizontal" || mode === "vertical" ? "Click once to place the line."
+              : pendingAnchor ? "Click a second point to finish the drawing." : "Click the first point on the chart."}
         </span>
       </div>
-      <div
-        ref={containerRef}
-        className="market-chart-canvas"
-        role="img"
-        aria-label={`${chartLabel} live candlestick chart`}
-      />
-      {candles.length === 0 && !liveCandle ? (
-        <div className="market-chart-empty" role="status">
-          <span className="market-chart-empty-title">Chart engine ready</span>
-          <span>{emptyMessage}</span>
+      <div className="market-chart-stage">
+        <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={`${chartLabel} live candlestick chart`} />
+        <svg className="drawing-overlay" width={size.width} height={size.height}
+          role="img" aria-label={`Drawings on ${chartLabel}`}
+          viewBox={`0 0 ${Math.max(1, size.width)} ${Math.max(1, size.height)}`}>
+          {history.drawings.map(renderShape)}
+        </svg>
+      </div>
+      {history.drawings.length ? <section className="drawing-object-tree" aria-label="Drawing objects">
+        <div className="drawing-object-tree-heading">
+          <strong>Objects ({history.drawings.length}/100)</strong>
+          <button type="button" onClick={() => setTreeOpen((open) => !open)} aria-expanded={treeOpen}>
+            {treeOpen ? "Hide list" : "Show list"}
+          </button>
         </div>
-      ) : null}
+        {treeOpen ? <ul>{history.drawings.map((drawing) => <li key={drawing.id}
+          className={selectedId === drawing.id ? "is-selected" : ""}>
+          <button type="button" className="drawing-object-select" onClick={() => setSelectedId(drawing.id)}
+            aria-pressed={selectedId === drawing.id}>
+            <span className="drawing-object-color" style={{ backgroundColor: drawing.style.color }} />
+            <span>{drawing.label}</span><small>{drawing.kind}</small>
+          </button>
+          <button type="button" onClick={() => commit({ type: "set-visible", id: drawing.id, visible: !drawing.visible })}
+            aria-label={`${drawing.visible ? "Hide" : "Show"} ${drawing.label}`}>{drawing.visible ? "Hide" : "Show"}</button>
+          <button type="button" onClick={() => commit({ type: "set-locked", id: drawing.id, locked: !drawing.locked })}
+            aria-label={`${drawing.locked ? "Unlock" : "Lock"} ${drawing.label}`}>{drawing.locked ? "Unlock" : "Lock"}</button>
+          <button type="button" disabled={drawing.locked} onClick={() => {
+            commit({ type: "delete", id: drawing.id });
+            if (selectedId === drawing.id) setSelectedId(null);
+          }} aria-label={`Delete ${drawing.label}`}>Delete</button>
+        </li>)}</ul> : null}
+      </section> : null}
+      {candles.length === 0 && !liveCandle ? <div className="market-chart-empty" role="status">
+        <span className="market-chart-empty-title">Chart engine ready</span><span>{emptyMessage}</span>
+      </div> : null}
+      <span className="sr-only" aria-live="polite">Chart viewport {viewportRevision}</span>
     </div>
   );
 }
