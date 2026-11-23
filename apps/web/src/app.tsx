@@ -196,7 +196,7 @@ export function App() {
           <span className="workspace-save-status" role="status">
             {storageStatus === "saved"
               ? "Workspace and watchlists saved in this browser"
-              : "Browser storage unavailable. Changes may not survive a reload."}
+              : "Storage is unavailable or saved data is unsupported; existing data was not overwritten."}
           </span>
         </div>
         <RiskPlanner />
