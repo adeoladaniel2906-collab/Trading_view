@@ -134,13 +134,11 @@ export function MarketChart({
   const lastPointRef = useRef<PixelPoint | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const previewRef = useRef<ChartDrawing | null>(null);
-  const ignoreNextClickRef = useRef(false);
   const drawingModeRef = useRef<DrawingTool>(null);
   const pendingAnchorRef = useRef<DrawingAnchor | null>(null);
   const contextRef = useRef(drawingContext);
   const keepDrawingRef = useRef(false);
   const drawingsRef = useRef<readonly ChartDrawing[]>([]);
-  const selectedIdRef = useRef<string | null>(null);
   const commitCommandRef = useRef<(command: Parameters<typeof applyDrawingCommand>[1]) => void>(() => undefined);
 
   const contextKey = `${drawingContext.market}:${drawingContext.symbol}:${drawingContext.timeframe}`;
@@ -161,7 +159,6 @@ export function MarketChart({
   drawingModeRef.current = drawingMode;
   pendingAnchorRef.current = pendingAnchor;
   keepDrawingRef.current = keepDrawing;
-  selectedIdRef.current = selectedId;
   previewRef.current = previewDrawing;
 
   const selectedDrawing = drawings.find((drawing) => drawing.id === selectedId) ?? null;
@@ -189,6 +186,8 @@ export function MarketChart({
     setSelectedId(null);
     setDrawingMode(null);
     setPendingAnchor(null);
+    pendingAnchorRef.current = null;
+    previewRef.current = null;
     setPreviewDrawing(null);
     setInteractionMessage("");
   }, [contextKey]);
@@ -210,16 +209,6 @@ export function MarketChart({
       locked: false,
       label: `${formatDrawingKind(kind)} ${count}`,
     });
-  };
-
-  const chartPointToAnchor = (point: PixelPoint): DrawingAnchor | null => {
-    const chart = chartRef.current;
-    const candleSeries = candleSeriesRef.current;
-    if (!chart || !candleSeries) return null;
-    const time = chart.timeScale().coordinateToTime(point.x);
-    const price = candleSeries.coordinateToPrice(point.y);
-    if (typeof time !== "number" || price === null || !Number.isFinite(price) || price <= 0) return null;
-    return { time: Math.round(time), price };
   };
 
   const projectAnchor = (anchor: DrawingAnchor): PixelPoint | null => {
@@ -415,6 +404,7 @@ export function MarketChart({
       try {
         const preview = validateDrawing({ ...drag.drawing, anchors });
         drag.moved = true;
+        previewRef.current = preview;
         setPreviewDrawing(preview);
       } catch {
         // Ignore invalid intermediate geometry; the last valid preview remains visible.
@@ -423,10 +413,6 @@ export function MarketChart({
 
     const handleClick = (event: MouseEventParams<Time>) => {
       if (!event.point) return;
-      if (ignoreNextClickRef.current) {
-        ignoreNextClickRef.current = false;
-        return;
-      }
       const point = { x: event.point.x, y: event.point.y };
       const tool = drawingModeRef.current;
       const anchor = toAnchor(point);
@@ -494,7 +480,6 @@ export function MarketChart({
       if (!drag) return;
       const preview = previewRef.current;
       if (drag.moved && preview) {
-        ignoreNextClickRef.current = true;
         commitCommandRef.current({
           type: "update",
           id: drag.drawing.id,
@@ -643,9 +628,21 @@ export function MarketChart({
 
     let shape;
     if (projected.kind === "horizontal") {
-      shape = <line x1={0} y1={projected.y} x2={plotWidth} y2={projected.y} />;
+      shape = (
+        <line
+          x1={0} y1={projected.y} x2={plotWidth} y2={projected.y}
+          stroke={stroke} strokeWidth={selected ? width + 1 : width}
+          strokeDasharray={dash}
+        />
+      );
     } else if (projected.kind === "vertical") {
-      shape = <line x1={projected.x} y1={0} x2={projected.x} y2={plotHeight} />;
+      shape = (
+        <line
+          x1={projected.x} y1={0} x2={projected.x} y2={plotHeight}
+          stroke={stroke} strokeWidth={selected ? width + 1 : width}
+          strokeDasharray={dash}
+        />
+      );
     } else if (projected.kind === "rectangle") {
       shape = (
         <rect
@@ -655,10 +652,20 @@ export function MarketChart({
           height={Math.max(0, projected.bottom - projected.top)}
           fill={stroke}
           fillOpacity={0.06}
+          stroke={stroke}
+          strokeWidth={selected ? width + 1 : width}
+          strokeDasharray={dash}
         />
       );
     } else {
-      shape = <line x1={projected.start.x} y1={projected.start.y} x2={projected.end.x} y2={projected.end.y} />;
+      shape = (
+        <line
+          x1={projected.start.x} y1={projected.start.y}
+          x2={projected.end.x} y2={projected.end.y}
+          stroke={stroke} strokeWidth={selected ? width + 1 : width}
+          strokeDasharray={dash}
+        />
+      );
     }
 
     const anchors = drawing.kind === "horizontal"
@@ -674,12 +681,7 @@ export function MarketChart({
 
     return (
       <g key={drawing.id} opacity={drawing.locked ? 0.65 : 1}>
-        {React.cloneElement(shape, {
-          stroke,
-          strokeWidth: selected ? width + 1 : width,
-          strokeDasharray: dash,
-          fill: projected.kind === "rectangle" ? stroke : "none",
-        })}
+        {shape}
         {drawing.kind === "measurement" && projected.kind === "line" ? (
           <text
             x={(projected.start.x + projected.end.x) / 2 + 8}
@@ -785,7 +787,7 @@ export function MarketChart({
         ) : null}
       </div>
 
-      <details className="drawing-object-tree" open={drawings.length > 0}>
+      <details className="drawing-object-tree" defaultOpen={drawings.length > 0}>
         <summary>Drawings ({drawings.length}/100)</summary>
         {drawings.length === 0 ? (
           <p className="drawing-object-empty">No drawings in this instrument and timeframe.</p>
@@ -819,9 +821,10 @@ export function MarketChart({
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedId !== drawing.id) setSelectedId(drawing.id);
-                    if (!drawing.locked) commitCommand({ type: "delete", id: drawing.id });
-                    if (selectedId === drawing.id && !drawing.locked) setSelectedId(null);
+                    if (!drawing.locked) {
+                      commitCommand({ type: "delete", id: drawing.id });
+                      if (selectedId === drawing.id) setSelectedId(null);
+                    }
                   }}
                   disabled={drawing.locked}
                   aria-label={`Delete ${drawing.label}`}
