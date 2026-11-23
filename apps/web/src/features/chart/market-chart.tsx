@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -60,7 +60,7 @@ export function MarketChart({
   const [redoCount, setRedoCount] = useState(0);
   const [trendPointPending, setTrendPointPending] = useState(false);
 
-  const renderDrawing = (record: DrawingRecord): RenderedDrawing | null => {
+  const renderDrawing = useCallback((record: DrawingRecord): RenderedDrawing | null => {
     const chart = chartRef.current;
     const candleSeries = candleSeriesRef.current;
     if (!chart || !candleSeries) return null;
@@ -261,7 +261,7 @@ export function MarketChart({
     };
     chart.subscribeClick(handleClick);
     return () => chart.unsubscribeClick(handleClick);
-  }, [drawingMode]);
+  }, [drawingMode, renderDrawing]);
 
   const undoDrawing = () => {
     const drawing = drawingsRef.current.pop();
