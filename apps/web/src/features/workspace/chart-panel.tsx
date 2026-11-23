@@ -1,4 +1,5 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
+import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
 import {
   SUPPORTED_SYMBOLS,
   SUPPORTED_TIMEFRAMES,
@@ -24,7 +25,7 @@ interface ChartPanelProps {
   readonly active: boolean;
   readonly onActivate: () => void;
   readonly onSelectionChange: (selection: PanelSelection) => void;
-  readonly onIndicatorChange: (update: Partial<Pick<ChartPanelState, "showSma" | "showEma">>) => void;
+  readonly onIndicatorChange: (indicator: IndicatorId, enabled: boolean) => void;
   readonly compact: boolean;
 }
 
@@ -117,25 +118,22 @@ export function ChartPanel({
             ))}
           </select>
         </label>
-        <fieldset className="chart-panel-indicators">
-          <legend>Indicators</legend>
-          <label>
-            <input
-              type="checkbox"
-              checked={panel.showSma}
-              onChange={(event) => onIndicatorChange({ showSma: event.currentTarget.checked })}
-            />
-            SMA 20
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={panel.showEma}
-              onChange={(event) => onIndicatorChange({ showEma: event.currentTarget.checked })}
-            />
-            EMA 20
-          </label>
-        </fieldset>
+        <details className="chart-panel-indicator-menu">
+          <summary>Indicators</summary>
+          <fieldset className="chart-panel-indicators">
+            <legend>Available indicators</legend>
+            {INDICATOR_CATALOG.map((indicator) => (
+              <label key={indicator.id}>
+                <input
+                  type="checkbox"
+                  checked={panel.indicators[indicator.id]}
+                  onChange={(event) => onIndicatorChange(indicator.id, event.currentTarget.checked)}
+                />
+                {indicator.id.toUpperCase()}
+              </label>
+            ))}
+          </fieldset>
+        </details>
       </div>
 
       <MarketChart
@@ -145,8 +143,7 @@ export function ChartPanel({
         market={panel.market}
         symbol={panel.symbol}
         chartLabel={displaySymbol(panel.market, panel.symbol)}
-        showSma={panel.showSma}
-        showEma={panel.showEma}
+        indicators={panel.indicators}
         compact={compact}
         emptyMessage={
           message ||
