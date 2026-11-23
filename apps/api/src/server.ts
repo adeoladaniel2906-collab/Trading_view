@@ -8,7 +8,10 @@ async function start(): Promise<void> {
     config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
       ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
       : undefined;
-  const app = await buildApp(config, { marketDataProvider });
+  const app = await buildApp(
+    config,
+    marketDataProvider ? { marketDataProvider } : {},
+  );
 
   try {
     const address = await app.listen({ host: config.HOST, port: config.PORT });
