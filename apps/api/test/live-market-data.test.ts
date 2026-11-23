@@ -204,7 +204,7 @@ test("Twelve Data adapter keeps its API key server-side and aggregates Forex tic
   });
   const events: LiveMarketEvent[] = [];
   const unsubscribe = provider.subscribe(
-    { market: "forex", symbol: "EUR/USD", timeframe: "1m" },
+    { market: "forex", symbol: "EURUSD", timeframe: "1m" },
     (event) => events.push(event),
   );
 
