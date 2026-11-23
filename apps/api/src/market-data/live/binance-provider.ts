@@ -106,7 +106,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
   readonly market = "crypto" as const;
 
   private socket?: WebSocket;
-  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectDelay = 1_000;
   private stopped = false;
   private requestId = 1;
