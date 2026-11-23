@@ -77,6 +77,17 @@ test("indicator parameters are independent per panel and enforce valid ranges", 
   /not in the workspace/);
 });
 
+test("indicator price sources are independently configurable per panel", () => {
+  const createId = ids();
+  const workspace = resizeWorkspace(createWorkspaceState(createId), 2, createId);
+  assert.equal(workspace.panels[0]?.indicatorParameters.vwapSource, "hlc3");
+  const changed = updatePanelIndicatorParameter(workspace, "panel-2", "rsiSource", "hlc3");
+  assert.equal(changed.panels[0]?.indicatorParameters.rsiSource, "close");
+  assert.equal(changed.panels[1]?.indicatorParameters.rsiSource, "hlc3");
+  const invalid = updatePanelIndicatorParameter(changed, "panel-2", "rsiSource", "not-a-source" as never);
+  assert.equal(invalid, changed);
+});
+
 test("invalid layout and active panel IDs are rejected", () => {
   const state = createWorkspaceState(ids());
   assert.throws(() => resizeWorkspace(state, 3 as unknown as 1, ids()), /1, 2, or 4/);
