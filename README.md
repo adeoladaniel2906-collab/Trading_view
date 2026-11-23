@@ -29,6 +29,21 @@ Official references:
 - https://twelvedata.com/docs/market-data/time-series
 - https://twelvedata.com/pricing
 
+### Multi-provider live market-data pipeline
+
+The API now owns a live-data hub and server-side provider connections. The browser consumes a single Server-Sent Events (SSE) endpoint; it never connects directly to a vendor.
+
+- Crypto Spot: Binance WebSocket kline streams, normalized into the shared candle event contract.
+- Forex: Twelve Data WebSocket price events, enabled only when the API key and the existing display-license attestation are configured.
+- Provider adapters own upstream connection lifecycle, reconnect with capped exponential backoff, and resubscribe after reconnect.
+- The hub shares identical market/symbol/timeframe subscriptions across clients and enforces a per-client subscription cap.
+- SSE clients receive normalized events at GET /v1/markets/:market/:symbol/stream?timeframe=1m. Supported markets are crypto and forex.
+- Twelve Data live subscriptions default to a conservative maximum of 8 symbols until the account's actual entitlement is confirmed.
+
+Binance support in this phase is Spot market data, not futures or order execution. Twelve Data's price WebSocket provides ticks, not OHLC candles; the chart candle aggregator and frontend EventSource integration are follow-on work. Do not interpret a price tick as a completed candle. No provider credentials are sent to the browser.
+
+The current live hub is process-local. A multi-instance deployment will need a shared pub/sub layer and distributed subscription accounting before scaling horizontally.
+
 ## Data contract
 
 Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d, and 1w. The maximum candle request is 2,000 items. If no licensed provider is configured, the endpoint returns 503 instead of inventing prices.
