@@ -170,6 +170,8 @@ export function writePersistedWorkspace(
   if (serialized.length > MAX_WORKSPACE_STORAGE_CHARS ||
     !parsePersistedWorkspace(serialized)) return false;
   try {
+    const existing = storage.getItem(WORKSPACE_STORAGE_KEY);
+    if (existing !== null && !parsePersistedWorkspace(existing)) return false;
     storage.setItem(WORKSPACE_STORAGE_KEY, serialized);
     return true;
   } catch {
