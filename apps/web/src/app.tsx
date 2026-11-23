@@ -72,7 +72,7 @@ export function App() {
       getApiOrigin(),
     );
     const source = new EventSource(streamUrl.toString());
-    source.onopen = () => { if (active) setFeedStatus("live"); };
+    source.onopen = () => { if (active) setFeedStatus("connecting"); };
     source.onerror = () => { if (active) setFeedStatus("reconnecting"); };
     const handleMarketData = (event: Event) => {
       if (!active) return;
