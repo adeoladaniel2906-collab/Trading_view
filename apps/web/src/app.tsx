@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import {
+  feedHealthSchema,
   liveMarketEventSchema,
   marketCandlesResponseSchema,
+  marketRecoverySchema,
   timeframeSchema,
   type Candle,
   type LiveMarketName,
@@ -16,7 +18,7 @@ const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
 };
 const TIMEFRAMES = timeframeSchema.options;
 const FOREX_TIMEFRAMES: readonly Timeframe[] = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w", "1M"];
-type FeedStatus = "loading" | "connecting" | "live" | "reconnecting" | "unavailable";
+type FeedStatus = "loading" | "connecting" | "live" | "stale" | "recovering" | "degraded" | "reconnecting" | "unavailable";
 
 function getApiOrigin(): string {
   const configuredOrigin = import.meta.env.VITE_API_ORIGIN;
@@ -72,7 +74,33 @@ export function App() {
       getApiOrigin(),
     );
     const source = new EventSource(streamUrl.toString());
-    source.onopen = () => { if (active) setFeedStatus("connecting"); };
+    let openedBefore = false;
+    source.onopen = () => {
+      if (!active) return;
+      const reconnect = openedBefore;
+      openedBefore = true;
+      setFeedStatus(reconnect ? "recovering" : "connecting");
+      if (reconnect) {
+        void fetch(historyUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
+          .then(async (response) => {
+            if (!response.ok) throw new Error("Historical reconciliation failed.");
+            const parsed = marketCandlesResponseSchema.safeParse(await response.json());
+            if (!parsed.success || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) {
+              throw new Error("Historical reconciliation response failed validation.");
+            }
+            if (active) {
+              setCandles((previous) => {
+                const merged = new Map(previous.map((candle) => [candle.time, candle]));
+                for (const candle of parsed.data.candles) merged.set(candle.time, candle);
+                return [...merged.values()].sort((a, b) => a.time - b.time);
+              });
+              setLiveCandle((current) => current && current.time >= (parsed.data.candles.at(-1)?.time ?? 0) ? current : null);
+              setFeedStatus("connecting");
+            }
+          })
+          .catch(() => { if (active) setFeedStatus("degraded"); });
+      }
+    };
     source.onerror = () => { if (active) setFeedStatus("reconnecting"); };
     const handleMarketData = (event: Event) => {
       if (!active) return;
@@ -97,6 +125,32 @@ export function App() {
       setFeedStatus("live");
     };
     source.addEventListener("market-data", handleMarketData);
+    source.addEventListener("feed-health", (event) => {
+      if (!active) return;
+      let payload: unknown;
+      try { payload = JSON.parse((event as MessageEvent<string>).data); } catch { return; }
+      const parsed = feedHealthSchema.safeParse(payload);
+      if (!parsed.success || parsed.data.market !== market || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) return;
+      if (parsed.data.state === "recovering") setFeedStatus("recovering");
+      else if (parsed.data.state === "stale") setFeedStatus("stale");
+      else if (parsed.data.state === "degraded") setFeedStatus("degraded");
+      else if (parsed.data.state === "connecting") setFeedStatus("connecting");
+      else if (parsed.data.state === "live") setFeedStatus("live");
+    });
+    source.addEventListener("recovery", (event) => {
+      if (!active) return;
+      let payload: unknown;
+      try { payload = JSON.parse((event as MessageEvent<string>).data); } catch { return; }
+      const parsed = marketRecoverySchema.safeParse(payload);
+      if (!parsed.success || parsed.data.market !== market || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) return;
+      setCandles((previous) => {
+        const merged = new Map(previous.map((candle) => [candle.time, candle]));
+        for (const candle of parsed.data.candles) merged.set(candle.time, candle);
+        return [...merged.values()].sort((a, b) => a.time - b.time);
+      });
+      setLiveCandle((current) => current && current.time >= parsed.data.reconciledThrough ? current : null);
+      setFeedStatus(parsed.data.unresolvedFrom === null ? "live" : "degraded");
+    });
 
     return () => {
       active = false;
@@ -109,6 +163,9 @@ export function App() {
     loading: "Loading market data",
     connecting: "Connecting",
     live: market === "crypto" ? "Binance live" : "Twelve Data live",
+    stale: "Feed may be stale",
+    recovering: "Recovering market data",
+    degraded: "Data recovery incomplete",
     reconnecting: "Reconnecting",
     unavailable: "Data temporarily unavailable",
   }[feedStatus];

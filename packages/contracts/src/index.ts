@@ -109,3 +109,43 @@ export const liveMarketEventSchema = z.union([
 ]);
 
 export type LiveMarketEvent = z.infer<typeof liveMarketEventSchema>;
+
+export const feedStateSchema = z.enum([
+  "connecting",
+  "live",
+  "stale",
+  "recovering",
+  "degraded",
+]);
+export type FeedState = z.infer<typeof feedStateSchema>;
+
+export const feedHealthSchema = z.object({
+  market: liveMarketNameSchema,
+  symbol: z.string().min(1).max(32),
+  timeframe: timeframeSchema,
+  provider: z.string().min(1).max(32),
+  state: feedStateSchema,
+  lastEventAt: z.number().int().positive().nullable(),
+  lastReceivedAt: z.number().int().positive().nullable(),
+  unresolvedFrom: z.number().int().positive().nullable(),
+  messageCode: z.enum([
+    "CONNECTING",
+    "HEALTHY",
+    "STALE_FEED",
+    "RECONNECTING",
+    "BACKFILLING",
+    "RECOVERY_FAILED",
+    "GAP_UNRESOLVED",
+  ]),
+}).strict();
+export type FeedHealth = z.infer<typeof feedHealthSchema>;
+
+export const marketRecoverySchema = z.object({
+  market: liveMarketNameSchema,
+  symbol: z.string().min(1).max(32),
+  timeframe: timeframeSchema,
+  candles: candleSeriesSchema,
+  reconciledThrough: z.number().int().positive(),
+  unresolvedFrom: z.number().int().positive().nullable(),
+}).strict();
+export type MarketRecovery = z.infer<typeof marketRecoverySchema>;

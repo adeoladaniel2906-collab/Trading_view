@@ -92,7 +92,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
 
   await registerHealthRoutes(app);
   await registerMarketDataRoutes(app, dependencies.marketDataProvider, dependencies.marketDataProviders);
-  await registerLiveMarketDataRoutes(app, dependencies.liveMarketDataHub);
+  await registerLiveMarketDataRoutes(app, dependencies.liveMarketDataHub, dependencies.marketDataProviders);
   if (dependencies.liveMarketDataHub) {
     app.addHook("onClose", async () => dependencies.liveMarketDataHub?.close());
   }
