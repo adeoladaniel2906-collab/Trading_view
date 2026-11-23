@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LiveMarketName } from "@market/contracts";
 import type { IndicatorId } from "./features/chart/indicators";
 import type { ChartType } from "./features/chart/chart-types";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
+import {
+  getBrowserStorage,
+  readPersistedWorkspace,
+  writePersistedWorkspace,
+} from "./features/workspace/workspace-storage";
 import {
   createWorkspaceState,
   resizeWorkspace,
@@ -19,13 +24,24 @@ import {
 const LAYOUT_OPTIONS: readonly WorkspaceLayout[] = [1, 2, 4];
 
 export function App() {
-  const [workspace, setWorkspace] = useState(() =>
-    createWorkspaceState(() => crypto.randomUUID()),
-  );
-  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>({
-    crypto: ["BTCUSDT", "ETHUSDT"],
-    forex: ["EURUSD", "GBPUSD"],
+  const [initialSnapshot] = useState(() => {
+    const storage = getBrowserStorage();
+    return storage ? readPersistedWorkspace(storage) : null;
   });
+  const [workspace, setWorkspace] = useState(() =>
+    initialSnapshot?.workspace ?? createWorkspaceState(() => crypto.randomUUID()),
+  );
+  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>(() => ({
+    crypto: [...(initialSnapshot?.watchlists.crypto ?? ["BTCUSDT", "ETHUSDT"])],
+    forex: [...(initialSnapshot?.watchlists.forex ?? ["EURUSD", "GBPUSD"])],
+  }));
+  const [storageStatus, setStorageStatus] = useState<"saved" | "unavailable">("saved");
+
+  useEffect(() => {
+    const storage = getBrowserStorage();
+    const saved = storage ? writePersistedWorkspace(storage, workspace, watchlist) : false;
+    setStorageStatus(saved ? "saved" : "unavailable");
+  }, [workspace, watchlist]);
   const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
     ?? workspace.panels[0];
 
@@ -177,6 +193,11 @@ export function App() {
 
         <div className="workspace-active-note" aria-live="polite">
           Active panel: {activePanel?.symbol ?? "None"} · Changes apply to the active panel unless synchronization is enabled.
+          <span className="workspace-save-status" role="status">
+            {storageStatus === "saved"
+              ? "Workspace and watchlists saved in this browser"
+              : "Browser storage unavailable. Changes may not survive a reload."}
+          </span>
         </div>
         <RiskPlanner />
       </section>
