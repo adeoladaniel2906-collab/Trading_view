@@ -16,21 +16,33 @@ export interface MacdPoint {
   readonly signal: number;
   readonly histogram: number;
 }
-export type IndicatorId = "sma" | "ema" | "rsi" | "macd" | "bollinger" | "atr" | "vwap";
+export interface StochasticPoint {
+  readonly time: number;
+  readonly k: number;
+  readonly d: number;
+}
+export type IndicatorId =
+  | "sma" | "ema" | "wma" | "vwma" | "rsi" | "macd"
+  | "bollinger" | "atr" | "stochastic" | "obv" | "vwap";
 export interface IndicatorDefinition {
   readonly id: IndicatorId;
   readonly label: string;
   readonly pane: "overlay" | "oscillator";
   readonly defaultEnabled: boolean;
+  readonly formula: string;
 }
 export const INDICATOR_CATALOG: readonly IndicatorDefinition[] = [
-  { id: "sma", label: "Simple Moving Average", pane: "overlay", defaultEnabled: false },
-  { id: "ema", label: "Exponential Moving Average", pane: "overlay", defaultEnabled: false },
-  { id: "bollinger", label: "Bollinger Bands", pane: "overlay", defaultEnabled: false },
-  { id: "vwap", label: "Volume Weighted Average Price", pane: "overlay", defaultEnabled: false },
-  { id: "rsi", label: "Relative Strength Index", pane: "oscillator", defaultEnabled: false },
-  { id: "macd", label: "Moving Average Convergence Divergence", pane: "oscillator", defaultEnabled: false },
-  { id: "atr", label: "Average True Range", pane: "oscillator", defaultEnabled: false },
+  { id: "sma", label: "Simple Moving Average", pane: "overlay", defaultEnabled: false, formula: "Arithmetic mean of closing prices over the period." },
+  { id: "ema", label: "Exponential Moving Average", pane: "overlay", defaultEnabled: false, formula: "EMA seeded with the period SMA; alpha = 2 / (period + 1)." },
+  { id: "wma", label: "Weighted Moving Average", pane: "overlay", defaultEnabled: false, formula: "Linearly weighted closing-price average; newest observation has the largest weight." },
+  { id: "vwma", label: "Volume Weighted Moving Average", pane: "overlay", defaultEnabled: false, formula: "Sum(close × volume) / sum(volume); requires complete provider volume in each window." },
+  { id: "bollinger", label: "Bollinger Bands", pane: "overlay", defaultEnabled: false, formula: "SMA with population standard-deviation bands." },
+  { id: "vwap", label: "Volume Weighted Average Price", pane: "overlay", defaultEnabled: false, formula: "UTC-day anchored typical-price VWAP; requires positive provider volume." },
+  { id: "rsi", label: "Relative Strength Index", pane: "oscillator", defaultEnabled: false, formula: "Wilder-smoothed relative strength, bounded from 0 to 100." },
+  { id: "macd", label: "Moving Average Convergence Divergence", pane: "oscillator", defaultEnabled: false, formula: "Fast EMA minus slow EMA, with EMA signal and histogram." },
+  { id: "stochastic", label: "Stochastic Oscillator", pane: "oscillator", defaultEnabled: false, formula: "%K uses the rolling high/low range; %D is the SMA of %K." },
+  { id: "atr", label: "Average True Range", pane: "oscillator", defaultEnabled: false, formula: "Wilder-smoothed true range, including gaps from prior close." },
+  { id: "obv", label: "On Balance Volume", pane: "oscillator", defaultEnabled: false, formula: "Cumulative volume signed by close-to-close direction; requires complete provider volume." },
 ] as const;
 
 function assertPeriod(period: number, label: string): void {
@@ -71,6 +83,50 @@ export function exponentialMovingAverage(candles: readonly Candle[], period: num
     if (!candle) continue;
     previous = (candle.close - previous) * multiplier + previous;
     result.push({ time: candle.time, value: previous });
+  }
+  return result;
+}
+
+export function weightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+  assertPeriod(period, "WMA");
+  const result: IndicatorPoint[] = [];
+  const denominator = (period * (period + 1)) / 2;
+  for (let end = period - 1; end < candles.length; end += 1) {
+    let weightedSum = 0;
+    for (let offset = 0; offset < period; offset += 1) {
+      const candle = candles[end - period + 1 + offset];
+      if (!candle) { weightedSum = Number.NaN; break; }
+      weightedSum += candle.close * (offset + 1);
+    }
+    const candle = candles[end];
+    if (candle && Number.isFinite(weightedSum)) {
+      result.push({ time: candle.time, value: weightedSum / denominator });
+    }
+  }
+  return result;
+}
+
+/** Rolling volume-weighted close. A window with missing/invalid volume is omitted. */
+export function volumeWeightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+  assertPeriod(period, "VWMA");
+  const result: IndicatorPoint[] = [];
+  for (let end = period - 1; end < candles.length; end += 1) {
+    let priceVolume = 0;
+    let totalVolume = 0;
+    let valid = true;
+    for (let index = end - period + 1; index <= end; index += 1) {
+      const candle = candles[index];
+      if (!candle || candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0) {
+        valid = false;
+        break;
+      }
+      priceVolume += candle.close * candle.volume;
+      totalVolume += candle.volume;
+    }
+    const candle = candles[end];
+    if (valid && candle && totalVolume > 0) {
+      result.push({ time: candle.time, value: priceVolume / totalVolume });
+    }
   }
   return result;
 }
@@ -182,6 +238,54 @@ export function bollingerBands(
       upper: middle + multiplier * deviation,
       lower: middle - multiplier * deviation,
     });
+  }
+  return result;
+}
+
+export function stochasticOscillator(
+  candles: readonly Candle[],
+  period = 14,
+  signalPeriod = 3,
+): StochasticPoint[] {
+  assertPeriod(period, "Stochastic");
+  assertPeriod(signalPeriod, "Stochastic signal");
+  const raw: IndicatorPoint[] = [];
+  for (let end = period - 1; end < candles.length; end += 1) {
+    const window = candles.slice(end - period + 1, end + 1);
+    if (window.length !== period) continue;
+    const highest = Math.max(...window.map((candle) => candle.high));
+    const lowest = Math.min(...window.map((candle) => candle.low));
+    const current = candles[end];
+    if (!current) continue;
+    const range = highest - lowest;
+    raw.push({ time: current.time, value: range === 0 ? 50 : ((current.close - lowest) / range) * 100 });
+  }
+  const signal = new Map(simpleMovingAverage(
+    raw.map((point) => ({ time: point.time, open: point.value, high: point.value, low: point.value, close: point.value })),
+    signalPeriod,
+  ).map((point) => [point.time, point.value]));
+  return raw.flatMap((point) => {
+    const d = signal.get(point.time);
+    return d === undefined ? [] : [{ time: point.time, k: point.value, d }];
+  });
+}
+
+export function onBalanceVolume(candles: readonly Candle[]): IndicatorPoint[] {
+  if (candles.some((candle) =>
+    candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0)) return [];
+  if (candles.length === 0) return [];
+  const result: IndicatorPoint[] = [];
+  let cumulative = 0;
+  const first = candles[0];
+  if (!first) return [];
+  result.push({ time: first.time, value: cumulative });
+  for (let index = 1; index < candles.length; index += 1) {
+    const current = candles[index];
+    const previous = candles[index - 1];
+    if (!current || !previous) continue;
+    if (current.close > previous.close) cumulative += current.volume ?? 0;
+    else if (current.close < previous.close) cumulative -= current.volume ?? 0;
+    result.push({ time: current.time, value: cumulative });
   }
   return result;
 }
