@@ -83,7 +83,7 @@ const liveMarketBaseSchema = z.object({
   receivedAt: z.number().int().positive(),
 });
 
-export const liveMarketEventSchema = z.discriminatedUnion("kind", [
+export const liveMarketEventSchema = z.union([
   liveMarketBaseSchema.extend({
     kind: z.literal("candle"),
     market: z.literal("crypto"),
