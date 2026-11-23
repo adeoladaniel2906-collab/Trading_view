@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
-import { liveMarketEventSchema, type Candle } from "@market/contracts";
+import {
+  liveMarketEventSchema,
+  marketCandlesResponseSchema,
+  timeframeSchema,
+  type Candle,
+  type Timeframe,
+} from "@market/contracts";
 import { MarketChart } from "./features/chart/market-chart";
 
 const EMPTY_CANDLES: readonly Candle[] = [];
 const MARKET_SYMBOL = "BTCUSDT";
-const MARKET_TIMEFRAME = "1m";
-
-type FeedStatus = "connecting" | "live" | "reconnecting";
+const TIMEFRAMES = timeframeSchema.options;
+type FeedStatus = "loading" | "connecting" | "live" | "reconnecting" | "unavailable";
 
 function getApiOrigin(): string {
   const configuredOrigin = import.meta.env.VITE_API_ORIGIN;
@@ -15,16 +20,48 @@ function getApiOrigin(): string {
 }
 
 export function App() {
+  const [timeframe, setTimeframe] = useState<Timeframe>("1m");
+  const [candles, setCandles] = useState<readonly Candle[]>(EMPTY_CANDLES);
   const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
-  const [feedStatus, setFeedStatus] = useState<FeedStatus>("connecting");
+  const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
+  const [dataMessage, setDataMessage] = useState("Loading historical Binance candles.");
 
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setCandles(EMPTY_CANDLES);
+    setLiveCandle(null);
+    setFeedStatus("loading");
+    setDataMessage("Loading historical Binance candles.");
+
+    const historyUrl = new URL(
+      `/v1/markets/crypto/${MARKET_SYMBOL}/candles?timeframe=${encodeURIComponent(timeframe)}&limit=500`,
+      getApiOrigin(),
+    );
+    void fetch(historyUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Historical market data is unavailable.");
+        const parsed = marketCandlesResponseSchema.safeParse(await response.json());
+        if (!parsed.success || parsed.data.symbol !== MARKET_SYMBOL || parsed.data.timeframe !== timeframe) {
+          throw new Error("The historical market-data response failed validation.");
+        }
+        if (active) {
+          setCandles(parsed.data.candles);
+          setDataMessage("");
+        }
+      })
+      .catch((error: unknown) => {
+        if (active && !(error instanceof DOMException && error.name === "AbortError")) {
+          setDataMessage(error instanceof Error ? error.message : "Historical data is unavailable.");
+          setFeedStatus("unavailable");
+        }
+      });
+
     const streamUrl = new URL(
-      `/v1/markets/crypto/${MARKET_SYMBOL}/stream?timeframe=${MARKET_TIMEFRAME}`,
+      `/v1/markets/crypto/${MARKET_SYMBOL}/stream?timeframe=${encodeURIComponent(timeframe)}`,
       getApiOrigin(),
     );
     const source = new EventSource(streamUrl.toString());
-
     source.onopen = () => setFeedStatus("live");
     source.onerror = () => setFeedStatus("reconnecting");
     const handleMarketData = (event: Event) => {
@@ -35,7 +72,6 @@ export function App() {
       } catch {
         return;
       }
-
       const parsed = liveMarketEventSchema.safeParse(payload);
       if (
         !parsed.success ||
@@ -43,21 +79,26 @@ export function App() {
         parsed.data.market !== "crypto" ||
         parsed.data.provider !== "binance" ||
         parsed.data.symbol !== MARKET_SYMBOL ||
-        parsed.data.timeframe !== MARKET_TIMEFRAME
+        parsed.data.timeframe !== timeframe
       ) return;
-
       setLiveCandle(parsed.data.candle);
       setFeedStatus("live");
     };
     source.addEventListener("market-data", handleMarketData);
 
-    return () => source.close();
-  }, []);
+    return () => {
+      active = false;
+      controller.abort();
+      source.close();
+    };
+  }, [timeframe]);
 
   const statusLabel = {
+    loading: "Loading market data",
     connecting: "Connecting to Binance",
     live: "Binance live",
     reconnecting: "Reconnecting to Binance",
+    unavailable: "Data temporarily unavailable",
   }[feedStatus];
 
   return (
@@ -73,8 +114,8 @@ export function App() {
         <p className="eyebrow">Independent market analysis</p>
         <h1 id="page-title">A clearer view of the markets.</h1>
         <p className="intro-copy">
-          Live BTC/USDT one-minute candles are delivered through the server-side Binance
-          gateway. Provider credentials and upstream connections stay off the browser.
+          Historical and live BTC/USDT candles are routed through the Binance Spot provider.
+          Changing the interval reloads history and switches the matching live stream.
         </p>
       </section>
       <section className="workspace-panel" aria-labelledby="chart-title">
@@ -84,21 +125,33 @@ export function App() {
             <h2 id="chart-title">BTC / USDT</h2>
           </div>
           <span className="status-pill" aria-live="polite">
-            <span className="status-dot" aria-hidden="true" />
+            <span className="status-dot" />
             {statusLabel}
           </span>
         </div>
         <div className="chart-toolbar">
-          <span className="chart-symbol">BINANCE: BTCUSDT</span>
-          <span className="chart-timeframe">1 minute · Spot market</span>
+          <span className="chart-symbol">BINANCE: BTCUSDT · Spot</span>
+          <label className="timeframe-control">
+            <span>Interval</span>
+            <select
+              aria-label="Chart timeframe"
+              value={timeframe}
+              onChange={(event) => setTimeframe(event.currentTarget.value as Timeframe)}
+            >
+              {TIMEFRAMES.map((interval) => (
+                <option key={interval} value={interval}>{interval}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <MarketChart
-          candles={EMPTY_CANDLES}
+          candles={candles}
           liveCandle={liveCandle}
           emptyMessage={
-            feedStatus === "reconnecting"
-              ? "The live feed is reconnecting. The last received candle remains visible."
-              : "Waiting for the first verified Binance candle. No prices are simulated."
+            dataMessage ||
+            (feedStatus === "reconnecting"
+              ? "The live feed is reconnecting. Waiting for the next verified update."
+              : "Waiting for the first verified Binance candle. No prices are simulated.")
           }
         />
       </section>
