@@ -22,7 +22,7 @@ A server-side Twelve Data adapter is included. It sends the API key using the pr
 
 The adapter is disabled unless both TWELVE_DATA_API_KEY and TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED=true are configured in the API server environment. The second setting is an operator attestation, not an automatic license check. Do not enable it unless the specific subscription and exchange agreements permit displaying the data in this application.
 
-The current Twelve Data Basic/free plan is described as internal non-display usage. Do not use that plan to populate a chart. The Grow tier lists internal display data access and is currently priced from $79/month billed monthly. Confirm current terms, exchange coverage, and pricing before enabling display. No API key or paid subscription is included here.
+The current Twelve Data Basic/free plan is described as internal non-display usage. Do not use that plan to populate a chart. The Grow tier lists internal display data access and is currently priced from $29/month billed monthly. Confirm current terms, exchange coverage, and pricing before enabling display. No API key or paid subscription is included here.
 
 Official references:
 - https://twelvedata.com/docs/introduction
