@@ -43,7 +43,8 @@ The API binds to loopback by default. Set `HOST=0.0.0.0` only when the deploymen
 
 ## Quality checks
 
-- `pnpm check` - lint and formatting checks.
+- `pnpm check` - lint checks.
+- `pnpm format` - apply consistent formatting.
 - `pnpm typecheck` - TypeScript checks for all workspaces.
 - `pnpm test` - API integration tests.
 - `pnpm build` - production builds.
