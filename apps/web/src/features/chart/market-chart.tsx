@@ -214,10 +214,10 @@ export function MarketChart({
     setDragPreview(null);
   };
 
-  const cancelDrag = () => {
+  const cancelDrag = useCallback(() => {
     setDragState(null);
     setDragPreview(null);
-  };
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -489,7 +489,7 @@ export function MarketChart({
             .flatMap((drawing) => drawing.anchors.map((anchor, index) => {
               const point = chart && series ? pointForAnchor(chart, series, anchor) : null;
               if (!point) return null;
-              return <circle key={`${drawing.id}-handle-${index}`} cx={point.x} cy={point.y} r="5"
+              return <circle key={`${drawing.id}-handle-${anchor.time}-${anchor.price}`} cx={point.x} cy={point.y} r="5"
                 fill="#151c26" stroke={drawing.style.color} strokeWidth="2" pointerEvents="all"
                 onPointerDown={(event) => beginDrag(event, drawing, index)} />;
             }))}
@@ -505,7 +505,7 @@ export function MarketChart({
         {treeOpen ? <ul>{history.drawings.map((drawing) => <li key={drawing.id}
           className={selectedId === drawing.id ? "is-selected" : ""}>
           {editingId === drawing.id ? (
-            <input className="drawing-object-label-input" autoFocus maxLength={80} value={labelDraft}
+            <input className="drawing-object-label-input" maxLength={80} value={labelDraft}
               aria-label={`Rename ${drawing.kind}`}
               onChange={(event) => setLabelDraft(event.currentTarget.value)}
               onBlur={() => {
