@@ -26,13 +26,13 @@ test("Twelve Data credential is sent only in the server-side Authorization heade
   });
 
   const candles = await provider.getCandles(
-    { symbol: "AAPL", timeframe: "1d", limit: 100 },
+    { symbol: "AAPL", timeframe: "1h", limit: 100 },
     new AbortController().signal,
   );
   assert.equal(authorization, "apikey test-secret-key");
   assert.equal(new URL(capturedUrl).searchParams.has("apikey"), false);
   assert.deepEqual(candles, [{
-    time: Date.parse("2024-12-31T13:00:00.000Z") / 1000,
+    time: Date.parse("2025-01-01T00:00:00.000Z") / 1000,
     open: 10, high: 12, low: 9, close: 11, volume: 100,
   }]);
 });
