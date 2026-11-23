@@ -98,3 +98,23 @@ test("non-success HTTP responses are rejected", async () => {
     /status 401/,
   );
 });
+
+
+test("Twelve Data adapter cancels oversized streaming responses", async () => {
+  const largeBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array(1_000_001));
+      controller.close();
+    },
+  });
+  const provider = new TwelveDataProvider("test-secret-key", async () =>
+    new Response(largeBody, { status: 200 }),
+  );
+  await assert.rejects(
+    provider.getCandles(
+      { symbol: "AAPL", timeframe: "1d", limit: 10 },
+      new AbortController().signal,
+    ),
+    /size limit/,
+  );
+});
