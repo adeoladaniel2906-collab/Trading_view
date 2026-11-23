@@ -343,10 +343,11 @@ export function volumeWeightedAveragePrice(candles: readonly Candle[]): Indicato
       cumulativeVolume = 0;
       cumulativePriceVolume = 0;
     }
-    if (candle.volume <= 0) continue;
+    const volume = candle.volume;
+    if (volume === undefined || volume <= 0) continue;
     const typicalPrice = (candle.high + candle.low + candle.close) / 3;
-    cumulativeVolume += candle.volume;
-    cumulativePriceVolume += typicalPrice * candle.volume;
+    cumulativeVolume += volume;
+    cumulativePriceVolume += typicalPrice * volume;
     result.push({ time: candle.time, value: cumulativePriceVolume / cumulativeVolume });
   }
   return result;
