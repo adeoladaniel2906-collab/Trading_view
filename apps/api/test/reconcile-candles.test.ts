@@ -39,6 +39,18 @@ test("latest open live candle corrects the matching historical interval", () => 
   assert.equal(result[1]?.close, 12.5);
 });
 
+test("a delayed open update cannot reopen a candle already marked closed", () => {
+  const result = reconcileCandles({
+    historical: [],
+    live: [
+      { candle: { ...history[0], close: 11.5, high: 12 }, closed: true },
+      { candle: { ...history[0], close: 10.5, high: 12 }, closed: false },
+    ],
+  });
+
+  assert.equal(result[0]?.close, 11.5);
+});
+
 test("reconciliation does not fabricate candles across a gap", () => {
   const result = reconcileCandles({
     historical: [history[0], { ...history[1], time: 1_700_000_180 }],
