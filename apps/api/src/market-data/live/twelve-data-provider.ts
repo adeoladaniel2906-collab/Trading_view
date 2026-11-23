@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import type { LiveMarketEvent, LiveMarketRequest } from "@market/contracts";
+import type { Candle, LiveMarketEvent, LiveMarketRequest, Timeframe } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
 
 interface TwelveDataMessage {
@@ -11,11 +11,33 @@ interface TwelveDataMessage {
   readonly ask?: unknown;
 }
 
+interface Channel {
+  readonly request: LiveMarketRequest;
+  readonly listeners: Set<LiveMarketListener>;
+  candle?: Candle;
+}
+
+const intervalSeconds: Partial<Record<Timeframe, number>> = {
+  "1s": 1, "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1_800,
+  "1h": 3_600, "2h": 7_200, "4h": 14_400, "6h": 21_600, "8h": 28_800,
+  "12h": 43_200, "1d": 86_400, "3d": 259_200, "1w": 604_800,
+};
+
 function numeric(value: unknown): number | undefined {
   const parsed = typeof value === "number" ? value : Number(value);
   return value === null || value === undefined || value === "" || !Number.isFinite(parsed)
     ? undefined
     : parsed;
+}
+
+function bucketStart(timestampSeconds: number, timeframe: Timeframe): number {
+  if (timeframe === "1M") {
+    const date = new Date(timestampSeconds * 1000);
+    return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) / 1000);
+  }
+  const duration = intervalSeconds[timeframe];
+  if (!duration) throw new Error("Unsupported Forex candle timeframe");
+  return Math.floor(timestampSeconds / duration) * duration;
 }
 
 export class TwelveDataLiveProvider implements LiveMarketDataProvider {
@@ -27,7 +49,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private reconnectDelay = 1_000;
   private stopped = false;
-  private readonly symbols = new Map<string, Set<LiveMarketListener>>();
+  private readonly channels = new Map<string, Channel>();
 
   constructor(
     private readonly apiKey: string,
@@ -42,29 +64,32 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     if (request.market !== "forex") throw new Error("Twelve Data live adapter is configured for Forex");
     if (!/^[A-Z]{3}\/[A-Z]{3}$/.test(request.symbol)) throw new Error("Invalid Forex currency pair");
     const symbol = request.symbol.toUpperCase();
-    let listeners = this.symbols.get(symbol);
-    if (!listeners) {
-      if (this.symbols.size >= this.maximumSymbols) {
+    const key = symbol + ":" + request.timeframe;
+    let channel = this.channels.get(key);
+    if (!channel) {
+      const activeSymbols = new Set([...this.channels.values()].map((item) => item.request.symbol));
+      if (!activeSymbols.has(symbol) && activeSymbols.size >= this.maximumSymbols) {
         throw new Error("Twelve Data live-subscription capacity has been reached");
       }
-      listeners = new Set();
-      this.symbols.set(symbol, listeners);
+      channel = { request: { ...request, symbol }, listeners: new Set() };
+      this.channels.set(key, channel);
+      if (!activeSymbols.has(symbol) && this.socket?.readyState === WebSocket.OPEN) {
+        this.send({ action: "subscribe", params: { symbols: symbol } });
+      }
       this.ensureConnected();
     }
-    listeners.add(listener);
-    if (this.socket?.readyState === WebSocket.OPEN && listeners.size === 1) {
-      this.send({ action: "subscribe", params: { symbols: symbol } });
-    }
+    channel.listeners.add(listener);
 
     let active = true;
     return () => {
       if (!active) return;
       active = false;
-      const current = this.symbols.get(symbol);
-      current?.delete(listener);
-      if (current?.size === 0) {
-        this.symbols.delete(symbol);
-        if (this.socket?.readyState === WebSocket.OPEN) {
+      const current = this.channels.get(key);
+      current?.listeners.delete(listener);
+      if (current?.listeners.size === 0) {
+        this.channels.delete(key);
+        const stillSubscribed = [...this.channels.values()].some((item) => item.request.symbol === symbol);
+        if (!stillSubscribed && this.socket?.readyState === WebSocket.OPEN) {
           this.send({ action: "unsubscribe", params: { symbols: symbol } });
         }
       }
@@ -72,7 +97,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
   }
 
   private ensureConnected(): void {
-    if (this.stopped || this.socket || this.symbols.size === 0) return;
+    if (this.stopped || this.socket || this.channels.size === 0) return;
     let socket: WebSocket;
     try {
       socket = this.socketFactory("wss://ws.twelvedata.com/v1/quotes/price", this.apiKey);
@@ -83,11 +108,9 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     this.socket = socket;
     socket.on("open", () => {
       this.reconnectDelay = 1_000;
-      if (this.symbols.size) {
-        this.send({
-          action: "subscribe",
-          params: { symbols: [...this.symbols.keys()].join(",") },
-        });
+      const symbols = [...new Set([...this.channels.values()].map((item) => item.request.symbol))];
+      if (symbols.length) {
+        this.send({ action: "subscribe", params: { symbols: symbols.join(",") } });
       }
       this.heartbeatTimer = setInterval(() => {
         this.send({ action: "heartbeat" });
@@ -117,24 +140,51 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     const message = payload as TwelveDataMessage;
     if (message.event !== "price" || typeof message.symbol !== "string") return;
     const symbol = message.symbol.toUpperCase();
-    const listeners = this.symbols.get(symbol);
     const price = numeric(message.price);
     const timestamp = numeric(message.timestamp);
-    if (!listeners || price === undefined || timestamp === undefined || timestamp <= 0) return;
-    const bid = numeric(message.bid);
-    const ask = numeric(message.ask);
+    if (price === undefined || price <= 0 || timestamp === undefined || timestamp <= 0) return;
+    const tickTime = Math.floor(timestamp);
+    const receivedAt = Date.now();
+    for (const channel of this.channels.values()) {
+      if (channel.request.symbol !== symbol) continue;
+      const candleTime = bucketStart(tickTime, channel.request.timeframe);
+      if (channel.candle && channel.candle.time !== candleTime) {
+        this.publish(channel, channel.candle, tickTime * 1000, receivedAt, true);
+        channel.candle = undefined;
+      }
+      const previous = channel.candle;
+      const candle: Candle = previous
+        ? {
+            ...previous,
+            high: Math.max(previous.high, price),
+            low: Math.min(previous.low, price),
+            close: price,
+          }
+        : { time: candleTime, open: price, high: price, low: price, close: price };
+      channel.candle = candle;
+      this.publish(channel, candle, tickTime * 1000, receivedAt, false);
+    }
+  }
+
+  private publish(
+    channel: Channel,
+    candle: Candle,
+    timestamp: number,
+    receivedAt: number,
+    closed: boolean,
+  ): void {
     const event: LiveMarketEvent = {
-      kind: "price",
+      kind: "candle",
       market: "forex",
-      provider: "twelve-data",
-      symbol,
-      timestamp: Math.floor(timestamp * 1000),
-      receivedAt: Date.now(),
-      price,
-      ...(bid === undefined ? {} : { bid }),
-      ...(ask === undefined ? {} : { ask }),
+      provider: this.id,
+      symbol: channel.request.symbol,
+      timeframe: channel.request.timeframe,
+      timestamp,
+      receivedAt,
+      candle,
+      closed,
     };
-    for (const listener of [...listeners]) {
+    for (const listener of [...channel.listeners]) {
       try {
         listener(event);
       } catch {
@@ -148,7 +198,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
   }
 
   private scheduleReconnect(): void {
-    if (this.stopped || this.symbols.size === 0 || this.reconnectTimer) return;
+    if (this.stopped || this.channels.size === 0 || this.reconnectTimer) return;
     const delay = this.reconnectDelay;
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
     this.reconnectTimer = setTimeout(() => {
@@ -164,7 +214,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.reconnectTimer = undefined;
     this.heartbeatTimer = undefined;
-    this.symbols.clear();
+    this.channels.clear();
     const socket = this.socket;
     this.socket = undefined;
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
