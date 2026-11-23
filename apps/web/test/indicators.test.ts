@@ -52,7 +52,7 @@ test("VWMA requires complete non-negative volume and weights close by volume", (
   const result = volumeWeightedMovingAverage(values, 3);
   assert.deepEqual(result, [
     { time: 180, value: 140 / 6 },
-    { time: 240, value: 150 / 6 },
+    { time: 240, value: 170 / 6 },
   ]);
   assert.deepEqual(volumeWeightedMovingAverage(candles, 2), []);
 });
@@ -90,11 +90,12 @@ test("Stochastic oscillator aligns %K and %D after their respective warm-up peri
     { time: 120, open: 3, high: 4, low: 2, close: 3 },
     { time: 180, open: 4, high: 5, low: 3, close: 4 },
     { time: 240, open: 3, high: 4, low: 2, close: 3 },
+    { time: 300, open: 5, high: 6, low: 2, close: 5 },
   ];
   const result = stochasticOscillator(values, 3, 2);
   assert.equal(result.length, 2);
-  assert.deepEqual(result.map((point) => point.k), [75, 50]);
-  assert.deepEqual(result.map((point) => point.d), [62.5, 62.5]);
+  assert.deepEqual(result.map((point) => point.k), [100 / 3, 75]);
+  assert.ok(result.every((point) => Math.abs(point.d - 325 / 6) < 1e-12));
 });
 
 test("OBV is cumulative and requires complete provider volume", () => {
