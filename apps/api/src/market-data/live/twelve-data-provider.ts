@@ -40,6 +40,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
 
   subscribe(request: LiveMarketRequest, listener: LiveMarketListener): () => void {
     if (request.market !== "forex") throw new Error("Twelve Data live adapter is configured for Forex");
+    if (!/^[A-Z]{3}\/[A-Z]{3}$/.test(request.symbol)) throw new Error("Invalid Forex currency pair");
     const symbol = request.symbol.toUpperCase();
     let listeners = this.symbols.get(symbol);
     if (!listeners) {
