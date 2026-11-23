@@ -33,6 +33,9 @@ function requirePositive(name: string, value: number): void {
 }
 
 export function calculateRiskPlan(input: RiskPlanInput): RiskPlan {
+  if (input.side !== "long" && input.side !== "short") {
+    throw new RangeError("Trade side must be long or short");
+  }
   requirePositive("Account equity", input.accountEquity);
   requirePositive("Entry price", input.entryPrice);
   requirePositive("Stop price", input.stopPrice);
@@ -70,29 +73,63 @@ export function calculateRiskPlan(input: RiskPlanInput): RiskPlan {
     stopDistance * input.pointValue +
     (input.entryPrice + input.stopPrice) * input.pointValue * feeRate;
 
+  if (!Number.isFinite(riskBudget) || !Number.isFinite(estimatedRiskPerUnit) || estimatedRiskPerUnit <= 0) {
+    throw new RangeError("Risk calculation exceeds the supported numeric range");
+  }
+
   const rawQuantity = riskBudget / estimatedRiskPerUnit;
+  if (!Number.isFinite(rawQuantity) || rawQuantity <= 0) {
+    throw new RangeError("Risk budget cannot produce a finite positive quantity");
+  }
+
   const cappedQuantity = input.maximumQuantity === undefined
     ? rawQuantity
     : Math.min(rawQuantity, input.maximumQuantity);
-  const quantity = Math.floor((cappedQuantity + input.quantityStep * 1e-10) / input.quantityStep) * input.quantityStep;
+
+  // A JS number cannot represent every integer above MAX_SAFE_INTEGER. Refuse
+  // step counts that cannot be floored reliably instead of risking a wrong size.
+  const rawQuantityUnits = cappedQuantity / input.quantityStep;
+  if (!Number.isFinite(rawQuantityUnits) || rawQuantityUnits > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError("Quantity step is too small for reliable numeric sizing");
+  }
+
+  // Always round down to a valid quantity step. Never add an epsilon that can
+  // increase the position beyond its risk budget.
+  let quantityUnits = Math.floor(rawQuantityUnits);
+  let quantity = quantityUnits * input.quantityStep;
+  let estimatedLoss = quantity * estimatedRiskPerUnit;
+  if (!Number.isFinite(estimatedLoss)) {
+    throw new RangeError("Estimated loss exceeds the supported numeric range");
+  }
+
+  // Binary floating-point multiplication can land a few ULPs above the budget.
+  // If that happens, remove one full step and recalculate from the returned size.
+  while (quantityUnits > 0 && estimatedLoss > riskBudget) {
+    quantityUnits -= 1;
+    quantity = quantityUnits * input.quantityStep;
+    estimatedLoss = quantity * estimatedRiskPerUnit;
+  }
 
   if (!Number.isFinite(quantity) || quantity < input.minimumQuantity) {
     throw new RangeError("Risk budget is too small for the instrument's minimum quantity and step size");
   }
 
-  const estimatedLoss =
-    quantity * estimatedRiskPerUnit;
   const estimatedProfitPerUnit =
     targetDistance * input.pointValue -
     (input.entryPrice + input.targetPrice) * input.pointValue * feeRate;
   const estimatedProfit = quantity * estimatedProfitPerUnit;
+  const rewardToRisk = estimatedProfit / estimatedLoss;
+
+  if (!Number.isFinite(estimatedLoss) || !Number.isFinite(estimatedProfit) || !Number.isFinite(rewardToRisk)) {
+    throw new RangeError("Risk plan output exceeds the supported numeric range");
+  }
 
   return {
-    quantity: Number(quantity.toPrecision(12)),
+    quantity,
     riskBudget,
     estimatedLoss,
     estimatedProfit,
-    rewardToRisk: estimatedProfit / estimatedLoss,
+    rewardToRisk,
     stopDistance,
     targetDistance,
   };
