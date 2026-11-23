@@ -3,7 +3,7 @@ import type { CandleRequest, MarketDataProvider } from "./provider.js";
 
 const intervalByTimeframe: Partial<Record<Timeframe, string>> = {
   "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-  "1h": "1h", "2h": "2h", "4h": "4h", "8h": "8h",
+  "1h": "1h", "2h": "2h", "4h": "4h",
   "1d": "1day", "1w": "1week", "1M": "1month",
 };
 
@@ -111,7 +111,10 @@ export class TwelveDataProvider implements MarketDataProvider {
     const interval = intervalByTimeframe[request.timeframe];
     if (!interval) throw new Error("Twelve Data does not support this timeframe for Forex");
     const url = new URL("https://api.twelvedata.com/time_series");
-    url.searchParams.set("symbol", request.symbol);
+    const symbol = /^[A-Z]{6}$/.test(request.symbol)
+      ? request.symbol.slice(0, 3) + "/" + request.symbol.slice(3)
+      : request.symbol;
+    url.searchParams.set("symbol", symbol);
     url.searchParams.set("interval", interval);
     url.searchParams.set("outputsize", String(request.limit));
     url.searchParams.set("order", "ASC");
