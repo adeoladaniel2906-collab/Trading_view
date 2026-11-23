@@ -1,6 +1,9 @@
 import { loadConfig } from "./config/env.js";
 import { buildApp } from "./app.js";
 import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
+import { BinanceLiveProvider } from "./market-data/live/binance-provider.js";
+import { TwelveDataLiveProvider } from "./market-data/live/twelve-data-provider.js";
+import { LiveMarketDataHub } from "./market-data/live/hub.js";
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -8,15 +11,20 @@ async function start(): Promise<void> {
     config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
       ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
       : undefined;
-  const app = await buildApp(
-    config,
-    marketDataProvider ? { marketDataProvider } : {},
-  );
+  const liveProviders = [new BinanceLiveProvider()];
+  if (config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED) {
+    liveProviders.push(new TwelveDataLiveProvider(config.TWELVE_DATA_API_KEY));
+  }
+  const liveMarketDataHub = new LiveMarketDataHub(liveProviders);
+  const app = await buildApp(config, {
+    ...(marketDataProvider ? { marketDataProvider } : {}),
+    liveMarketDataHub,
+  });
 
   try {
     const address = await app.listen({ host: config.HOST, port: config.PORT });
     app.log.info(
-      { address, marketDataProvider: marketDataProvider?.id ?? "disabled" },
+      { address, marketDataProvider: marketDataProvider?.id ?? "disabled", liveProviders: liveProviders.map((provider) => provider.id) },
       "Market API listening",
     );
   } catch (error) {
