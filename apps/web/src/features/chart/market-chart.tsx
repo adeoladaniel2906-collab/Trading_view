@@ -141,6 +141,10 @@ export function MarketChart({
   const drawingsRef = useRef<readonly ChartDrawing[]>([]);
   const commitCommandRef = useRef<(command: Parameters<typeof applyDrawingCommand>[1]) => void>(() => undefined);
   const createRecordRef = useRef<(kind: DrawingKind, anchors: readonly DrawingAnchor[]) => ChartDrawing>(() => { throw new Error("Drawing factory is not ready"); });
+  const hitTestRef = useRef<(point: PixelPoint) => HitResult | null>(() => null);
+  const undoRef = useRef<() => void>(() => undefined);
+  const redoRef = useRef<() => void>(() => undefined);
+  const cancelToolRef = useRef<() => void>(() => undefined);
 
   const contextKey = `${drawingContext.market}:${drawingContext.symbol}:${drawingContext.timeframe}`;
   const [historyByContext, setHistoryByContext] = useState<Record<string, DrawingHistoryState>>({});
@@ -311,6 +315,10 @@ export function MarketChart({
     setPreviewDrawing(null);
     setInteractionMessage("");
   };
+  undoRef.current = undo;
+  redoRef.current = redo;
+  cancelToolRef.current = cancelTool;
+  hitTestRef.current = hitTest;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -458,14 +466,14 @@ export function MarketChart({
         }
         return;
       }
-      if (!tool) setSelectedId(hitTest(point)?.drawing.id ?? null);
+      if (!tool) setSelectedId(hitTestRef.current(point)?.drawing.id ?? null);
     };
 
     const handlePointerDown = (event: PointerEvent) => {
       if (drawingModeRef.current) return;
       const point = lastPointRef.current;
       if (!point) return;
-      const hit = hitTest(point);
+      const hit = hitTestRef.current(point);
       if (!hit) {
         setSelectedId(null);
         return;
@@ -592,17 +600,17 @@ export function MarketChart({
       const modifier = event.ctrlKey || event.metaKey;
       if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        if (event.shiftKey) redo();
-        else undo();
+        if (event.shiftKey) redoRef.current();
+        else undoRef.current();
         return;
       }
       if (modifier && event.key.toLowerCase() === "y") {
         event.preventDefault();
-        redo();
+        redoRef.current();
         return;
       }
       if (event.key === "Escape") {
-        cancelTool();
+        cancelToolRef.current();
         setSelectedId(null);
         return;
       }
@@ -610,14 +618,14 @@ export function MarketChart({
         const selected = drawings.find((drawing) => drawing.id === selectedId);
         if (selected && !selected.locked) {
           event.preventDefault();
-          commitCommand({ type: "delete", id: selectedId });
+          commitCommandRef.current({ type: "delete", id: selectedId });
           setSelectedId(null);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, drawings, undo, redo, cancelTool, commitCommand]);
+  }, [selectedId, drawings]);
 
   const chart = chartRef.current;
   const stage = stageRef.current;
@@ -701,7 +709,7 @@ export function MarketChart({
             {measurementLabel}
           </text>
         ) : null}
-        {selected && anchors.map((anchor, index) => (
+        {selected && anchors.map((anchor) => (
           <circle
             key={`${drawing.id}-${anchor.time}-${anchor.price}`}
             cx={anchor.x}
