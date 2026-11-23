@@ -174,7 +174,7 @@ export function relativeStrengthIndex(candles: readonly Candle[], period = 14, s
     const current = candles[index];
     const previous = candles[index - 1];
     if (!current || !previous) continue;
-    const change = current.close - previous.close;
+    const change = priceFromCandle(current, source) - priceFromCandle(previous, source);
     averageGain = (averageGain * (period - 1) + Math.max(0, change)) / period;
     averageLoss = (averageLoss * (period - 1) + Math.max(0, -change)) / period;
     result.push({ time: current.time, value: value() });
