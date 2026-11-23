@@ -14,6 +14,8 @@ import {
   type IndicatorId,
 } from "./indicators";
 import { heikinAshiCandles, type ChartType } from "./chart-types";
+import { loadDrawingHistory, saveDrawingHistory } from "./drawing-persistence";
+import { getBrowserStorage } from "../workspace/workspace-persistence";
 import "./market-chart.css";
 
 interface MarketChartProps {
@@ -96,7 +98,10 @@ export function MarketChart({
   }, [candles, liveCandle]);
 
   useEffect(() => {
-    const current = historiesRef.current.get(activeKey) ?? createDrawingHistory();
+    const context = { market, symbol, timeframe };
+    const current = historiesRef.current.get(activeKey) ??
+      loadDrawingHistory(getBrowserStorage(), context) ??
+      createDrawingHistory();
     historiesRef.current.set(activeKey, current);
     setHistory(current);
     setSelectedId(null);
@@ -105,23 +110,25 @@ export function MarketChart({
     setDragState(null);
     setDragPreview(null);
     setEditingId(null);
-  }, [activeKey]);
+  }, [activeKey, market, symbol, timeframe]);
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
     setHistory((current) => {
       const next = applyDrawingCommand(current, command);
       historiesRef.current.set(activeKey, next);
+      saveDrawingHistory(getBrowserStorage(), { market, symbol, timeframe }, next.drawings);
       return next;
     });
-  }, [activeKey]);
+  }, [activeKey, market, symbol, timeframe]);
 
   const commitHistory = useCallback((transform: (current: DrawingHistoryState) => DrawingHistoryState) => {
     setHistory((current) => {
       const next = transform(current);
       historiesRef.current.set(activeKey, next);
+      saveDrawingHistory(getBrowserStorage(), { market, symbol, timeframe }, next.drawings);
       return next;
     });
-  }, [activeKey]);
+  }, [activeKey, market, symbol, timeframe]);
 
   const addDrawing = useCallback((kind: DrawingKind, first: DrawingAnchor, second?: DrawingAnchor) => {
     const drawing: ChartDrawing = {
@@ -534,7 +541,7 @@ export function MarketChart({
         <label className="drawing-option"><input type="checkbox" checked={keepDrawing}
           onChange={(event) => setKeepDrawing(event.currentTarget.checked)} /> Keep drawing</label>
         <span className="drawing-hint" aria-live="polite">
-          {mode === "none" ? "Drawings are scoped to this symbol and timeframe in this session."
+          {mode === "none" ? "Drawings are scoped to this symbol and timeframe and stored locally in this browser."
             : mode === "horizontal" || mode === "vertical" ? "Click once to place the line."
               : pendingAnchor ? "Click a second point to finish the drawing." : "Click the first point on the chart."}
         </span>
