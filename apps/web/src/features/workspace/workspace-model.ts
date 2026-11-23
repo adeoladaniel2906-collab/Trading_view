@@ -186,17 +186,18 @@ export function updatePanelIndicatorParameter(
   parameter: IndicatorParameterKey,
   value: number,
 ): WorkspaceState {
-  if (!state.panels.some((panel) => panel.id === panelId)) {
+  const selectedPanel = state.panels.find((panel) => panel.id === panelId);
+  if (!selectedPanel) {
     throw new RangeError("Cannot update a panel that is not in the workspace");
   }
-  const updated = state.panels.map((panel) => {
-    if (panel.id !== panelId) return panel;
-    const indicatorParameters = { ...panel.indicatorParameters, [parameter]: value };
-    return isValidIndicatorParameters(indicatorParameters)
+  const indicatorParameters = { ...selectedPanel.indicatorParameters, [parameter]: value };
+  if (!isValidIndicatorParameters(indicatorParameters)) return state;
+  return {
+    ...state,
+    panels: state.panels.map((panel) => panel.id === panelId
       ? { ...panel, indicatorParameters }
-      : panel;
-  });
-  return { ...state, panels: updated };
+      : panel),
+  };
 }
 
 export function updatePanelIndicator(
