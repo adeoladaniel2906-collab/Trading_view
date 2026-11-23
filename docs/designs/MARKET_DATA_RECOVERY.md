@@ -224,3 +224,17 @@ Acceptance gate: reconnect recovery tests prove no known candle gap is silently 
 6. Add feed-health and recovery status to the chart UI.
 7. Add integration tests and operational metrics.
 8. Evaluate shared pub/sub and distributed subscription coordination before multi-instance hosting.
+
+
+## 14. Phase A implementation status (PR #14)
+
+The first implementation slice adds:
+- Validated `feed-health` SSE events for connecting, live, stale, recovering, and degraded states.
+- Binance stale detection after 15 seconds without a received kline update; stale detection also triggers a bounded historical refresh of the active candle.
+- Candle-time gap detection and a shared in-flight historical recovery request keyed by market, symbol, and timeframe.
+- Validation of the recovered candle series before it is sent to clients.
+- Browser-side timestamp merge that preserves a newer live candle instead of replacing it with older backfill data.
+- Binance recovery is only declared complete when every expected interval in the bounded recovery range is present.
+- Forex recovery is delivered to the chart but remains explicitly degraded after a detected gap. The current product does not yet have a provider-backed trading-session/holiday calendar, so it cannot prove whether missing intervals represent a closed market or missing data. It must not report a false healthy state.
+
+This implementation is a reliability foundation, not a claim of complete recovery under every provider failure. Remaining Phase A work includes Forex session-aware completeness, provider socket lifecycle status, replay semantics for SSE reconnects, load/fault testing, and distributed coordination for multi-instance deployment.
