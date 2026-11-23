@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  MAX_WORKSPACE_STORAGE_BYTES,
+  MAX_WORKSPACE_STORAGE_CHARS,
   WORKSPACE_STORAGE_KEY,
   parsePersistedWorkspace,
   readPersistedWorkspace,
@@ -61,7 +61,7 @@ test("workspace and watchlists round-trip with independent panel settings", () =
 test("parser rejects malformed JSON, unsupported versions and oversized payloads", () => {
   assert.equal(parsePersistedWorkspace("{"), null);
   assert.equal(parsePersistedWorkspace(JSON.stringify({ schemaVersion: 2 })), null);
-  assert.equal(parsePersistedWorkspace("x".repeat(MAX_WORKSPACE_STORAGE_BYTES + 1)), null);
+  assert.equal(parsePersistedWorkspace("x".repeat(MAX_WORKSPACE_STORAGE_CHARS + 1)), null);
 });
 
 test("parser rejects invalid panel identity, unsupported symbols and duplicate watchlist entries", () => {
