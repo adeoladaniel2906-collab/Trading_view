@@ -90,7 +90,7 @@ export function MarketChart({
       value: point.value,
     })));
     return { record, series };
-  };
+  }, []);
 
   const removeDrawing = (drawing: RenderedDrawing) => {
     const chart = chartRef.current;
