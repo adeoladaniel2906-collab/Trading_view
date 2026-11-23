@@ -31,7 +31,7 @@ export function App() {
             Datafeed not configured
           </span>
         </div>
-        <div className="chart-toolbar" aria-label="Chart information">
+        <div className="chart-toolbar">
           <span className="chart-symbol">No instrument selected</span>
           <span className="chart-timeframe">Timeframe controls unlock when market data is available</span>
         </div>
