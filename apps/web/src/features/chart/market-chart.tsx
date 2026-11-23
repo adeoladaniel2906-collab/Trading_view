@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
   type IChartApi, type ISeriesApi, type MouseEventParams, type Time, type UTCTimestamp,
@@ -6,7 +6,7 @@ import {
 import type { Candle, LiveMarketName, Timeframe } from "@market/contracts";
 import {
   DRAWING_COLORS, applyDrawingCommand, createDrawingHistory, redoDrawing, undoDrawing,
-  type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind,
+  snapDrawingAnchor, type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind, type DrawingSnapMode,
 } from "./drawings";
 import {
   averageTrueRange, bollingerBands, exponentialMovingAverage, movingAverageConvergenceDivergence,
@@ -98,6 +98,9 @@ export function MarketChart({
     setSelectedId(null);
     setPendingAnchor(null);
     setMode("none");
+    setDragState(null);
+    setDragPreview(null);
+    setEditingId(null);
   }, [activeKey]);
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
@@ -411,6 +414,9 @@ export function MarketChart({
   const series = candleSeriesRef.current;
   const renderShape = (drawing: ChartDrawing) => {
     if (!drawing.visible || !chart || !series) return null;
+    const activeDrawing = dragPreview?.drawingId === drawing.id
+      ? { ...drawing, anchors: dragPreview.anchors }
+      : drawing;
     const first = activeDrawing.anchors[0];
     if (!first) return null;
     const start = pointForAnchor(chart, series, first);
@@ -419,9 +425,6 @@ export function MarketChart({
     const end = second ? pointForAnchor(chart, series, second) : null;
     const selected = selectedId === drawing.id;
     const strokeWidth = drawing.style.lineWidth + (selected ? 1 : 0);
-    const activeDrawing = dragPreview?.drawingId === drawing.id
-      ? { ...drawing, anchors: dragPreview.anchors }
-      : drawing;
     const common = {
       stroke: drawing.style.color,
       strokeWidth,
