@@ -1,6 +1,7 @@
 import { loadConfig } from "./config/env.js";
 import { buildApp } from "./app.js";
 import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
+import { BinanceMarketDataProvider } from "./market-data/binance-provider.js";
 import { BinanceLiveProvider } from "./market-data/live/binance-provider.js";
 import { TwelveDataLiveProvider } from "./market-data/live/twelve-data-provider.js";
 import { LiveMarketDataHub } from "./market-data/live/hub.js";
@@ -13,12 +14,14 @@ async function start(): Promise<void> {
       ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
       : undefined;
   const liveProviders: LiveMarketDataProvider[] = [new BinanceLiveProvider()];
+  const marketDataProviders = { crypto: new BinanceMarketDataProvider(), ...(marketDataProvider ? { forex: marketDataProvider } : {}) };
   if (config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED) {
     liveProviders.push(new TwelveDataLiveProvider(config.TWELVE_DATA_API_KEY));
   }
   const liveMarketDataHub = new LiveMarketDataHub(liveProviders);
   const app = await buildApp(config, {
     ...(marketDataProvider ? { marketDataProvider } : {}),
+    marketDataProviders,
     liveMarketDataHub,
   });
 
