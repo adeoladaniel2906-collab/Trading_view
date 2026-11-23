@@ -29,6 +29,9 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
 .chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 54px; padding: 12px 20px; border-bottom: 1px solid #2a3544; }
 .chart-symbol { color: #e8edf5; font-size: 13px; font-weight: 650; }
 .chart-timeframe { color: #8491a2; font-size: 11px; }
+.timeframe-control { display: inline-flex; align-items: center; gap: 9px; color: #8491a2; font-size: 11px; }
+.timeframe-control select { min-width: 66px; padding: 7px 10px; border: 1px solid #344253; border-radius: 7px; background: #1c2633; color: #e8edf5; font: inherit; cursor: pointer; }
+.timeframe-control select:focus-visible { outline: 2px solid #d9f36a; outline-offset: 2px; }
 .footer { display: flex; justify-content: space-between; gap: 16px; padding-top: 20px; color: #7f8b9b; font-size: 11px; }
 .footer a { color: #aeb9c8; text-underline-offset: 3px; }
 @media (max-width: 640px) {
