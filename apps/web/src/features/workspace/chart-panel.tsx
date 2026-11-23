@@ -12,6 +12,7 @@ import {
   type PanelSelection,
 } from "../workspace/workspace-model";
 import { useMarketData } from "../market-data/use-market-data";
+import type { IndicatorTemplate } from "./indicator-templates";
 import { MarketChart } from "../chart/market-chart";
 import {
   advanceReplay,
@@ -48,6 +49,12 @@ interface ChartPanelProps {
   readonly syncCrosshair: boolean;
   readonly crosshairTime: number | null;
   readonly onCrosshairTime: (panelId: string, time: number | null) => void;
+  readonly indicatorTemplates: readonly IndicatorTemplate[];
+  readonly templateStorageStatus: "saved" | "unavailable";
+  readonly templateActionStatus: string | null;
+  readonly onSaveIndicatorTemplate: (name: string) => string | null;
+  readonly onApplyIndicatorTemplate: (templateId: string) => void;
+  readonly onDeleteIndicatorTemplate: (templateId: string) => void;
 }
 
 function displaySymbol(market: LiveMarketName, symbol: string): string {
@@ -66,6 +73,12 @@ export function ChartPanel({
   syncCrosshair,
   crosshairTime,
   onCrosshairTime,
+  indicatorTemplates,
+  templateStorageStatus,
+  templateActionStatus,
+  onSaveIndicatorTemplate,
+  onApplyIndicatorTemplate,
+  onDeleteIndicatorTemplate,
 }: ChartPanelProps) {
   const { candles, liveCandle, status, message } = useMarketData(
     panel.market,
@@ -78,6 +91,8 @@ export function ChartPanel({
 
   const replayKey = `${panel.market}:${panel.symbol}:${panel.timeframe}`;
   const [replayState, setReplayState] = useState<{ context: string; session: ReplaySession } | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const replay = replayState?.context === replayKey ? replayState.session : null;
 
   useEffect(() => {
@@ -281,6 +296,57 @@ export function ChartPanel({
               </fieldset>
             </div>
           </details>
+          <div className="chart-panel-indicator-templates">
+            <label>
+              <span>Template name</span>
+              <input
+                type="text"
+                maxLength={40}
+                value={templateName}
+                placeholder="e.g. Momentum setup"
+                onChange={(event) => setTemplateName(event.currentTarget.value)}
+              />
+            </label>
+            <button type="button" disabled={!templateName.trim()}
+              onClick={() => {
+                const id = onSaveIndicatorTemplate(templateName);
+                if (id) {
+                  setSelectedTemplateId(id);
+                  setTemplateName("");
+                }
+              }}>
+              Save current settings
+            </button>
+            <label>
+              <span>Saved templates</span>
+              <select value={selectedTemplateId}
+                onChange={(event) => setSelectedTemplateId(event.currentTarget.value)}>
+                <option value="">Choose a template</option>
+                {indicatorTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="chart-panel-indicator-template-actions">
+              <button type="button" disabled={!selectedTemplateId}
+                onClick={() => onApplyIndicatorTemplate(selectedTemplateId)}>
+                Apply to this panel
+              </button>
+              <button type="button" disabled={!selectedTemplateId}
+                onClick={() => {
+                  onDeleteIndicatorTemplate(selectedTemplateId);
+                  setSelectedTemplateId("");
+                }}>
+                Delete
+              </button>
+            </div>
+            <p role="status">
+              {templateStorageStatus === "saved"
+                ? "Templates are saved in this browser."
+                : "Template storage is unavailable; existing data was preserved."}
+            </p>
+            {templateActionStatus ? <p aria-live="polite">{templateActionStatus}</p> : null}
+          </div>
           </div>
         </details>
       </div>
