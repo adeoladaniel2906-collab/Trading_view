@@ -236,7 +236,7 @@ This section records what is actually merged or under review. A roadmap item is 
 
 | Workstream | Verified status | Remaining Phase B work |
 |---|---|---|
-| B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, symbol/timeframe synchronization and time-aligned crosshair synchronization are merged. | Drawing synchronization; browser/mobile regression suite. |
+| B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, and symbol/timeframe/crosshair/drawing synchronization are merged. | Named watchlists; browser/mobile regression suite. |
 | B2 Drawings | Six core drawing tools, object management, edit/rename/lock/hide/delete, snapping, undo/redo, and browser-local context-isolated persistence are merged. | Channels and advanced tools; full pointer/touch regression coverage; stronger viewport and multi-panel sync tests. |
 | B3 Indicators | Eleven core indicators are merged with editable per-panel periods, multipliers and OHLC-derived price sources. Workspace snapshots migrate through v4. | Independent reference fixtures, browser pane regression, and the 400+ built-in indicator/strategy catalogue remain. Named local indicator templates are merged. |
 | B4 Trading assistance | Non-executing risk planner with conservative quantity precision, local manual paper journal, planned/open/closed/cancelled lifecycle and basic risk summary are merged. | Instrument-aware pip/tick/contract value and fee assumptions; journal templates; strategy checklist; broader daily risk dashboard. |
