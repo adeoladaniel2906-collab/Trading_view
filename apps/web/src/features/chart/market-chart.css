@@ -31,3 +31,58 @@
   font-size: 15px;
   font-weight: 650;
 }
+
+.drawing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #2a3544;
+  background: #151c26;
+}
+
+.drawing-toolbar button {
+  padding: 6px 9px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #1c2633;
+  color: #b8c4d3;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.drawing-toolbar button[aria-pressed="true"] {
+  border-color: #d9f36a;
+  color: #e8edf5;
+}
+
+.drawing-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.drawing-toolbar button:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+
+.drawing-hint {
+  margin-left: auto;
+  color: #94a0b1;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .drawing-toolbar {
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .drawing-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
