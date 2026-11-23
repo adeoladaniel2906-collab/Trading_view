@@ -10,13 +10,18 @@ export interface BollingerPoint {
   readonly upper: number;
   readonly lower: number;
 }
+export interface StochasticPoint {
+  readonly time: number;
+  readonly k: number;
+  readonly d: number;
+}
 export interface MacdPoint {
   readonly time: number;
   readonly macd: number;
   readonly signal: number;
   readonly histogram: number;
 }
-export type IndicatorId = "sma" | "ema" | "rsi" | "macd" | "bollinger" | "atr" | "vwap";
+export type IndicatorId = "sma" | "ema" | "wma" | "vwma" | "rsi" | "macd" | "bollinger" | "atr" | "vwap" | "stochastic" | "obv";
 export interface IndicatorDefinition {
   readonly id: IndicatorId;
   readonly label: string;
@@ -26,15 +31,23 @@ export interface IndicatorDefinition {
 export const INDICATOR_CATALOG: readonly IndicatorDefinition[] = [
   { id: "sma", label: "Simple Moving Average", pane: "overlay", defaultEnabled: false },
   { id: "ema", label: "Exponential Moving Average", pane: "overlay", defaultEnabled: false },
+  { id: "wma", label: "Weighted Moving Average", pane: "overlay", defaultEnabled: false },
+  { id: "vwma", label: "Volume Weighted Moving Average", pane: "overlay", defaultEnabled: false },
   { id: "bollinger", label: "Bollinger Bands", pane: "overlay", defaultEnabled: false },
   { id: "vwap", label: "Volume Weighted Average Price", pane: "overlay", defaultEnabled: false },
   { id: "rsi", label: "Relative Strength Index", pane: "oscillator", defaultEnabled: false },
   { id: "macd", label: "Moving Average Convergence Divergence", pane: "oscillator", defaultEnabled: false },
   { id: "atr", label: "Average True Range", pane: "oscillator", defaultEnabled: false },
+  { id: "stochastic", label: "Stochastic Oscillator", pane: "oscillator", defaultEnabled: false },
+  { id: "obv", label: "On-Balance Volume", pane: "oscillator", defaultEnabled: false },
 ] as const;
 
+const MAX_INDICATOR_PERIOD = 2_000;
+
 function assertPeriod(period: number, label: string): void {
-  if (!Number.isInteger(period) || period < 1) throw new RangeError(`${label} period must be a positive integer`);
+  if (!Number.isInteger(period) || period < 1 || period > MAX_INDICATOR_PERIOD) {
+    throw new RangeError(`${label} period must be an integer from 1 to ${MAX_INDICATOR_PERIOD}`);
+  }
 }
 function assertMultiplier(multiplier: number): void {
   if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 10) {
@@ -52,6 +65,47 @@ export function simpleMovingAverage(candles: readonly Candle[], period: number):
     rollingSum += candle.close;
     if (index >= period) rollingSum -= candles[index - period]?.close ?? 0;
     if (index >= period - 1) result.push({ time: candle.time, value: rollingSum / period });
+  }
+  return result;
+}
+
+export function weightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+  assertPeriod(period, "WMA");
+  const result: IndicatorPoint[] = [];
+  const weightTotal = (period * (period + 1)) / 2;
+  for (let index = period - 1; index < candles.length; index += 1) {
+    let weightedSum = 0;
+    for (let offset = 0; offset < period; offset += 1) {
+      const candle = candles[index - period + 1 + offset];
+      if (!candle) continue;
+      weightedSum += candle.close * (offset + 1);
+    }
+    const candle = candles[index];
+    if (candle) result.push({ time: candle.time, value: weightedSum / weightTotal });
+  }
+  return result;
+}
+
+export function volumeWeightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+  assertPeriod(period, "VWMA");
+  const result: IndicatorPoint[] = [];
+  for (let index = period - 1; index < candles.length; index += 1) {
+    let priceVolume = 0;
+    let totalVolume = 0;
+    let completeVolume = true;
+    for (let offset = 0; offset < period; offset += 1) {
+      const candle = candles[index - period + 1 + offset];
+      if (!candle || candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0) {
+        completeVolume = false;
+        break;
+      }
+      priceVolume += candle.close * candle.volume;
+      totalVolume += candle.volume;
+    }
+    const candle = candles[index];
+    if (completeVolume && candle && totalVolume > 0) {
+      result.push({ time: candle.time, value: priceVolume / totalVolume });
+    }
   }
   return result;
 }
@@ -213,11 +267,71 @@ export function averageTrueRange(candles: readonly Candle[], period = 14): Indic
   return result;
 }
 
+export function stochasticOscillator(
+  candles: readonly Candle[],
+  period = 14,
+  signalPeriod = 3,
+): StochasticPoint[] {
+  assertPeriod(period, "Stochastic");
+  assertPeriod(signalPeriod, "Stochastic signal");
+  const rawK: IndicatorPoint[] = [];
+  for (let index = period - 1; index < candles.length; index += 1) {
+    const window = candles.slice(index - period + 1, index + 1);
+    const candle = candles[index];
+    if (window.length !== period || !candle) continue;
+    const highestHigh = Math.max(...window.map((item) => item.high));
+    const lowestLow = Math.min(...window.map((item) => item.low));
+    const range = highestHigh - lowestLow;
+    const k = range === 0 ? 50 : ((candle.close - lowestLow) / range) * 100;
+    rawK.push({ time: candle.time, value: k });
+  }
+  const result: StochasticPoint[] = [];
+  let rollingSum = 0;
+  for (let index = 0; index < rawK.length; index += 1) {
+    const point = rawK[index];
+    if (!point) continue;
+    rollingSum += point.value;
+    if (index >= signalPeriod) rollingSum -= rawK[index - signalPeriod]?.value ?? 0;
+    if (index >= signalPeriod - 1) {
+      result.push({
+        time: point.time,
+        k: point.value,
+        d: rollingSum / signalPeriod,
+      });
+    }
+  }
+  return result;
+}
+
 /**
- * UTC-day anchored VWAP. It only emits values when actual positive provider volume exists.
+ * OBV is unavailable unless every candle in the input has provider-supplied volume.
+ */
+export function onBalanceVolume(candles: readonly Candle[]): IndicatorPoint[] {
+  if (candles.length === 0 || candles.some((candle) =>
+    candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0)) return [];
+  const first = candles[0];
+  if (!first) return [];
+  const result: IndicatorPoint[] = [{ time: first.time, value: 0 }];
+  let cumulative = 0;
+  for (let index = 1; index < candles.length; index += 1) {
+    const current = candles[index];
+    const previous = candles[index - 1];
+    if (!current || !previous) continue;
+    const volume = current.volume ?? 0;
+    if (current.close > previous.close) cumulative += volume;
+    else if (current.close < previous.close) cumulative -= volume;
+    result.push({ time: current.time, value: cumulative });
+  }
+  return result;
+}
+
+/**
+ * UTC-day anchored VWAP. It is unavailable when any input candle lacks provider volume.
  * Markets without published volume intentionally produce no VWAP points.
  */
 export function volumeWeightedAveragePrice(candles: readonly Candle[]): IndicatorPoint[] {
+  if (candles.length === 0 || candles.some((candle) =>
+    candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0)) return [];
   const result: IndicatorPoint[] = [];
   let currentDay = -1;
   let cumulativeVolume = 0;
@@ -229,10 +343,11 @@ export function volumeWeightedAveragePrice(candles: readonly Candle[]): Indicato
       cumulativeVolume = 0;
       cumulativePriceVolume = 0;
     }
-    if (candle.volume === undefined || candle.volume <= 0) continue;
+    const volume = candle.volume;
+    if (volume === undefined || volume <= 0) continue;
     const typicalPrice = (candle.high + candle.low + candle.close) / 3;
-    cumulativeVolume += candle.volume;
-    cumulativePriceVolume += typicalPrice * candle.volume;
+    cumulativeVolume += volume;
+    cumulativePriceVolume += typicalPrice * volume;
     result.push({ time: candle.time, value: cumulativePriceVolume / cumulativeVolume });
   }
   return result;

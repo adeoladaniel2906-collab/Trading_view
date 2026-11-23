@@ -228,3 +228,21 @@ A feature is complete only when:
 - Performance/resource limits are measured.
 - Security review confirms no secret exposure or untrusted code execution.
 - UI clearly distinguishes live data, historical data, stale data, simulated data, and unavailable data.
+
+
+## 8. Verified implementation status (2026-11-23)
+
+This section records what is actually merged or under review. A roadmap item is not considered complete merely because a design document or first implementation slice exists.
+
+| Workstream | Verified status | Remaining Phase B work |
+|---|---|---|
+| B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, and symbol/timeframe synchronization are merged. | Crosshair and drawing synchronization; browser/mobile regression suite. |
+| B2 Drawings | Six core drawing tools, object management, edit/rename/lock/hide/delete, snapping, undo/redo, and browser-local context-isolated persistence are merged. | Channels and advanced tools; full pointer/touch regression coverage; stronger viewport and multi-panel sync tests. |
+| B3 Indicators | Seven core indicators are merged. An expansion to WMA, VWMA, Stochastic and OBV, plus a known local-storage migration, is under review. | Parameter editing, saved indicator templates, complete reference fixtures and browser pane regression. |
+| B4 Trading assistance | Non-executing risk and reward planner is merged. | Instrument-aware pip/tick/contract value and fee assumptions; paper ledger; journal; checklist; daily risk dashboard. |
+| B5 Monitoring/research | Deterministic historical bar replay is merged. | Authenticated persistent server-side alerts, screener foundations, multi-timeframe context and replay-to-journal. |
+| Phase C | Not started. | Secure script language/runtime and deterministic backtesting are later phases. |
+
+### Persistence boundary
+
+Workspace, watchlist and drawing persistence currently belongs to the browser profile. It does not provide account identity, cloud synchronization, or cross-device recovery. Server-side alerts and shared user records remain blocked until authentication, database ownership, retention and backup decisions are implemented. Browser timers are not a substitute for persistent server-side alert evaluation.

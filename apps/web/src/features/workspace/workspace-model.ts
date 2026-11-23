@@ -1,5 +1,5 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
-import type { IndicatorId } from "../chart/indicators";
+import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
 import type { ChartType } from "../chart/chart-types";
 
 export type WorkspaceLayout = 1 | 2 | 4;
@@ -47,13 +47,16 @@ export function isSupportedSelection(selection: PanelSelection): boolean {
 }
 
 function defaultPanel(id: string): ChartPanelState {
+  const indicators = Object.fromEntries(
+    INDICATOR_CATALOG.map((indicator) => [indicator.id, indicator.defaultEnabled]),
+  ) as Record<IndicatorId, boolean>;
   return {
     id,
     market: "crypto",
     symbol: "BTCUSDT",
     timeframe: "1m",
     chartType: "candles",
-    indicators: { sma: false, ema: false, rsi: false, macd: false, bollinger: false, atr: false, vwap: false },
+    indicators,
   };
 }
 
