@@ -154,10 +154,11 @@ test("live stream route returns unavailable when no hub is configured", async ()
 
 
 test("Binance adapter multiplexes a live kline stream and normalizes candle updates", () => {
-  let socket: FakeSocket | undefined;
+  const sockets: FakeSocket[] = [];
   const provider = new BinanceLiveProvider((url) => {
     assert.equal(url, "wss://stream.binance.com:9443/stream");
-    socket = new FakeSocket(url);
+    const socket = new FakeSocket(url);
+    sockets.push(socket);
     return socket as unknown as WebSocket;
   });
   const events: LiveMarketEvent[] = [];
@@ -166,6 +167,7 @@ test("Binance adapter multiplexes a live kline stream and normalizes candle upda
     (event) => events.push(event),
   );
 
+  const socket = sockets[0];
   assert.ok(socket);
   socket.open();
   assert.deepEqual(JSON.parse(socket.sent[0] ?? "{}").params, ["btcusdt@kline_1m"]);
@@ -191,11 +193,12 @@ test("Binance adapter multiplexes a live kline stream and normalizes candle upda
 });
 
 test("Twelve Data adapter keeps its API key in a server-side WebSocket header", () => {
-  let socket: FakeSocket | undefined;
+  const sockets: FakeSocket[] = [];
   const provider = new TwelveDataLiveProvider("server-only-secret", (url, key) => {
     assert.equal(url, "wss://ws.twelvedata.com/v1/quotes/price");
     assert.equal(key, "server-only-secret");
-    socket = new FakeSocket(url);
+    const socket = new FakeSocket(url);
+    sockets.push(socket);
     return socket as unknown as WebSocket;
   });
   const events: LiveMarketEvent[] = [];
@@ -204,6 +207,7 @@ test("Twelve Data adapter keeps its API key in a server-side WebSocket header", 
     (event) => events.push(event),
   );
 
+  const socket = sockets[0];
   assert.ok(socket);
   socket.open();
   assert.deepEqual(JSON.parse(socket.sent[0] ?? "{}"), {
