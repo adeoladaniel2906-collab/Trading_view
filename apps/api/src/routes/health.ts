@@ -1,5 +1,5 @@
+import { healthResponseSchema, type HealthResponse } from "@market/contracts";
 import type { FastifyInstance } from "fastify";
-import type { HealthResponse } from "@market/contracts";
 
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
   app.get("/health", async () => {
@@ -9,6 +9,6 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
       timestamp: new Date().toISOString(),
     };
 
-    return response;
+    return healthResponseSchema.parse(response);
   });
 }
