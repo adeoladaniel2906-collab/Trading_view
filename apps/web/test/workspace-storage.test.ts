@@ -115,32 +115,18 @@ test("known version-two snapshots migrate with default indicator parameters", ()
 
 test("known version-three snapshots migrate with preserved numeric settings and default sources", () => {
   const input = fixture();
-  const savedParameters = updatePanelIndicatorParameter(input.workspace, "panel-2", "rsiPeriod", 21)
-    .panels[1]?.indicatorParameters;
-  assert.ok(savedParameters);
-  const {
-    smaSource: _smaSource,
-    emaSource: _emaSource,
-    wmaSource: _wmaSource,
-    vwmaSource: _vwmaSource,
-    rsiSource: _rsiSource,
-    macdSource: _macdSource,
-    bollingerSource: _bollingerSource,
-    stochasticSource: _stochasticSource,
-    vwapSource: _vwapSource,
-    ...legacyParameters
-  } = savedParameters;
+  const changed = updatePanelIndicatorParameter(input.workspace, "panel-2", "rsiPeriod", 21);
+  const sourceKeys = new Set([
+    "smaSource", "emaSource", "wmaSource", "vwmaSource", "rsiSource",
+    "macdSource", "bollingerSource", "stochasticSource", "vwapSource",
+  ]);
   const versionThreeWorkspace = {
-    ...input.workspace,
-    panels: input.workspace.panels.map((panel, index) => ({
+    ...changed,
+    panels: changed.panels.map((panel) => ({
       ...panel,
-      indicatorParameters: index === 1 ? legacyParameters : (() => {
-        const {
-          smaSource, emaSource, wmaSource, vwmaSource, rsiSource, macdSource,
-          bollingerSource, stochasticSource, vwapSource, ...legacy
-        } = panel.indicatorParameters;
-        return legacy;
-      })(),
+      indicatorParameters: Object.fromEntries(
+        Object.entries(panel.indicatorParameters).filter(([key]) => !sourceKeys.has(key)),
+      ),
     })),
   };
   const migrated = parsePersistedWorkspace(JSON.stringify({
