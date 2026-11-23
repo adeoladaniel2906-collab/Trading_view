@@ -1,4 +1,4 @@
-import type { LiveMarketName } from "@market/contracts";
+import { timeframeSchema, type LiveMarketName } from "@market/contracts";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
 import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
 import {
@@ -64,32 +64,42 @@ function parseWorkspace(value: unknown): WorkspaceState {
       rawPanel.id.length < 1 || rawPanel.id.length > 128) {
       throw new TypeError("Saved chart panel identity is invalid");
     }
-    if (rawPanel.market !== "crypto" && rawPanel.market !== "forex") {
+    const market = rawPanel.market;
+    const symbol = rawPanel.symbol;
+    const timeframe = rawPanel.timeframe;
+    if (market !== "crypto" && market !== "forex") {
       throw new TypeError("Saved chart panel market is invalid");
     }
-    if (typeof rawPanel.symbol !== "string" || typeof rawPanel.timeframe !== "string" ||
-      !isSupportedSelection({
-        market: rawPanel.market,
-        symbol: rawPanel.symbol,
-        timeframe: rawPanel.timeframe as WorkspaceState["panels"][number]["timeframe"],
-      })) {
+    if (typeof symbol !== "string" || typeof timeframe !== "string") {
+      throw new TypeError("Saved chart panel selection is invalid");
+    }
+    const parsedTimeframe = timeframeSchema.safeParse(timeframe);
+    if (!parsedTimeframe.success || !isSupportedSelection({
+      market,
+      symbol,
+      timeframe: parsedTimeframe.data,
+    })) {
       throw new TypeError("Saved chart panel selection is unsupported");
     }
     if (typeof rawPanel.chartType !== "string" || !CHART_TYPES.has(rawPanel.chartType)) {
       throw new TypeError("Saved chart type is unsupported");
     }
-    if (!isRecord(rawPanel.indicators) ||
-      INDICATOR_IDS.some((id) => typeof rawPanel.indicators?.[id] !== "boolean") ||
-      Object.keys(rawPanel.indicators).some((id) => !INDICATOR_IDS.includes(id as IndicatorId))) {
+    const rawIndicators = rawPanel.indicators;
+    if (!isRecord(rawIndicators) ||
+      INDICATOR_IDS.some((id) => typeof rawIndicators[id] !== "boolean") ||
+      Object.keys(rawIndicators).some((id) => !INDICATOR_IDS.includes(id as IndicatorId))) {
       throw new TypeError("Saved indicator settings are invalid");
     }
+    const indicators = Object.fromEntries(
+      INDICATOR_IDS.map((id) => [id, rawIndicators[id]]),
+    ) as Record<IndicatorId, boolean>;
     return {
       id: rawPanel.id,
-      market: rawPanel.market,
-      symbol: rawPanel.symbol,
-      timeframe: rawPanel.timeframe,
+      market,
+      symbol,
+      timeframe: parsedTimeframe.data,
       chartType: rawPanel.chartType as ChartType,
-      indicators: Object.fromEntries(INDICATOR_IDS.map((id) => [id, rawPanel.indicators?.[id]])) as Record<IndicatorId, boolean>,
+      indicators,
     };
   });
   if (new Set(panels.map((panel) => panel.id)).size !== panels.length) {
