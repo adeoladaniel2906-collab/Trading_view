@@ -15,6 +15,7 @@ interface Channel {
   readonly request: LiveMarketRequest;
   readonly listeners: Set<LiveMarketListener>;
   candle?: Candle;
+  lastTickTime?: number;
 }
 
 const intervalSeconds: Partial<Record<Timeframe, number>> = {
@@ -149,6 +150,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     for (const channel of this.channels.values()) {
       if (channel.request.symbol !== symbol) continue;
       const candleTime = bucketStart(tickTime, channel.request.timeframe);
+      if (channel.lastTickTime !== undefined && tickTime < channel.lastTickTime) continue;
       if (channel.candle && candleTime < channel.candle.time) continue;
       if (channel.candle && channel.candle.time !== candleTime) {
         this.publish(channel, channel.candle, tickTime * 1000, receivedAt, true);
@@ -164,6 +166,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
           }
         : { time: candleTime, open: price, high: price, low: price, close: price };
       channel.candle = candle;
+      channel.lastTickTime = tickTime;
       this.publish(channel, candle, tickTime * 1000, receivedAt, false);
     }
   }
