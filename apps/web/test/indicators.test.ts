@@ -6,9 +6,13 @@ import {
   bollingerBands,
   exponentialMovingAverage,
   movingAverageConvergenceDivergence,
+  onBalanceVolume,
   relativeStrengthIndex,
   simpleMovingAverage,
+  stochasticOscillator,
   volumeWeightedAveragePrice,
+  volumeWeightedMovingAverage,
+  weightedMovingAverage,
 } from "../src/features/chart/indicators.js";
 
 const candles = [
@@ -22,6 +26,14 @@ test("SMA returns rolling averages aligned to candle timestamps", () => {
   assert.deepEqual(simpleMovingAverage(candles, 3), [
     { time: 180, value: 2 },
     { time: 240, value: 3 },
+  ]);
+});
+
+test("WMA gives the newest close the highest linear weight", () => {
+  const result = weightedMovingAverage(candles, 3);
+  assert.deepEqual(result, [
+    { time: 180, value: 14 / 6 },
+    { time: 240, value: 20 / 6 },
   ]);
 });
 
@@ -71,30 +83,74 @@ test("ATR uses true range including gaps from the previous close", () => {
   ]);
 });
 
-test("VWAP resets at UTC day boundaries and requires real provider volume", () => {
+test("VWMA weights closes by actual provider volume and skips incomplete windows", () => {
+  const values = [
+    { time: 60, open: 10, high: 10, low: 10, close: 10, volume: 1 },
+    { time: 120, open: 20, high: 20, low: 20, close: 20, volume: 2 },
+    { time: 180, open: 30, high: 30, low: 30, close: 30, volume: 3 },
+    { time: 240, open: 40, high: 40, low: 40, close: 40 },
+  ];
+  assert.deepEqual(volumeWeightedMovingAverage(values, 3), [
+    { time: 180, value: 140 / 6 },
+  ]);
+  assert.deepEqual(volumeWeightedMovingAverage(candles, 2), []);
+});
+
+test("Stochastic returns %K and its signal average after their warm-up windows", () => {
+  const values = [
+    { time: 60, open: 5, high: 10, low: 0, close: 5 },
+    { time: 120, open: 10, high: 12, low: 2, close: 10 },
+    { time: 180, open: 12, high: 14, low: 4, close: 12 },
+  ];
+  const result = stochasticOscillator(values, 2, 2);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]?.time, 180);
+  assert.ok(Math.abs((result[0]?.k ?? 0) - (100 / 3 * 2)) < 1e-12);
+  assert.ok(Math.abs((result[0]?.d ?? 0) - (100 / 3 * 2)) < 1e-12);
+});
+
+test("OBV follows close direction and is unavailable without complete volume", () => {
+  const values = [
+    { time: 60, open: 10, high: 10, low: 10, close: 10, volume: 100 },
+    { time: 120, open: 11, high: 11, low: 11, close: 11, volume: 20 },
+    { time: 180, open: 9, high: 9, low: 9, close: 9, volume: 30 },
+    { time: 240, open: 9, high: 9, low: 9, close: 9, volume: 40 },
+  ];
+  assert.deepEqual(onBalanceVolume(values), [
+    { time: 60, value: 0 },
+    { time: 120, value: 20 },
+    { time: 180, value: -10 },
+    { time: 240, value: -10 },
+  ]);
+  assert.deepEqual(onBalanceVolume(candles), []);
+});
+
+test("VWAP resets at UTC day boundaries and requires complete provider volume", () => {
   const values = [
     { time: 86_399, open: 9, high: 12, low: 6, close: 9, volume: 2 },
     { time: 86_400, open: 19, high: 22, low: 16, close: 19, volume: 1 },
     { time: 86_460, open: 29, high: 32, low: 26, close: 29, volume: 3 },
     { time: 86_520, open: 39, high: 42, low: 36, close: 39 },
   ];
-  assert.deepEqual(volumeWeightedAveragePrice(values), [
+  assert.deepEqual(volumeWeightedAveragePrice(values.slice(0, 3)), [
     { time: 86_399, value: 9 },
     { time: 86_400, value: 19 },
     { time: 86_460, value: 26.5 },
   ]);
+  assert.deepEqual(volumeWeightedAveragePrice(values), []);
   assert.deepEqual(volumeWeightedAveragePrice(candles), []);
 });
 
 test("indicator catalogue declares overlay and oscillator families", () => {
   assert.deepEqual(INDICATOR_CATALOG.map((item) => item.id), [
-    "sma", "ema", "bollinger", "vwap", "rsi", "macd", "atr",
+    "sma", "ema", "wma", "vwma", "bollinger", "vwap", "rsi", "macd", "atr", "stochastic", "obv",
   ]);
   assert.equal(INDICATOR_CATALOG.find((item) => item.id === "rsi")?.pane, "oscillator");
 });
 
 test("indicators reject invalid periods and band multipliers", () => {
   assert.throws(() => simpleMovingAverage(candles, 0), RangeError);
+  assert.throws(() => weightedMovingAverage(candles, 2_001), RangeError);
   assert.throws(() => exponentialMovingAverage(candles, 1.5), RangeError);
   assert.throws(() => relativeStrengthIndex(candles, 0), RangeError);
   assert.throws(() => averageTrueRange(candles, -1), RangeError);
