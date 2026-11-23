@@ -1,5 +1,20 @@
 import type { Candle } from "@market/contracts";
 
+export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "hlcc4";
+
+export function priceFromCandle(candle: Candle, source: PriceSource): number {
+  switch (source) {
+    case "open": return candle.open;
+    case "high": return candle.high;
+    case "low": return candle.low;
+    case "close": return candle.close;
+    case "hl2": return (candle.high + candle.low) / 2;
+    case "hlc3": return (candle.high + candle.low + candle.close) / 3;
+    case "ohlc4": return (candle.open + candle.high + candle.low + candle.close) / 4;
+    case "hlcc4": return (candle.high + candle.low + candle.close * 2) / 4;
+  }
+}
+
 export interface IndicatorPoint {
   readonly time: number;
   readonly value: number;
@@ -55,21 +70,22 @@ function assertMultiplier(multiplier: number): void {
   }
 }
 
-export function simpleMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+export function simpleMovingAverage(candles: readonly Candle[], period: number, source: PriceSource = "close"): IndicatorPoint[] {
   assertPeriod(period, "SMA");
   const result: IndicatorPoint[] = [];
   let rollingSum = 0;
   for (let index = 0; index < candles.length; index += 1) {
     const candle = candles[index];
     if (!candle) continue;
-    rollingSum += candle.close;
-    if (index >= period) rollingSum -= candles[index - period]?.close ?? 0;
+    rollingSum += priceFromCandle(candle, source);
+    const expired = index >= period ? candles[index - period] : undefined;
+    if (expired) rollingSum -= priceFromCandle(expired, source);
     if (index >= period - 1) result.push({ time: candle.time, value: rollingSum / period });
   }
   return result;
 }
 
-export function weightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+export function weightedMovingAverage(candles: readonly Candle[], period: number, source: PriceSource = "close"): IndicatorPoint[] {
   assertPeriod(period, "WMA");
   const result: IndicatorPoint[] = [];
   const weightTotal = (period * (period + 1)) / 2;
@@ -78,7 +94,7 @@ export function weightedMovingAverage(candles: readonly Candle[], period: number
     for (let offset = 0; offset < period; offset += 1) {
       const candle = candles[index - period + 1 + offset];
       if (!candle) continue;
-      weightedSum += candle.close * (offset + 1);
+      weightedSum += priceFromCandle(candle, source) * (offset + 1);
     }
     const candle = candles[index];
     if (candle) result.push({ time: candle.time, value: weightedSum / weightTotal });
@@ -86,7 +102,7 @@ export function weightedMovingAverage(candles: readonly Candle[], period: number
   return result;
 }
 
-export function volumeWeightedMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+export function volumeWeightedMovingAverage(candles: readonly Candle[], period: number, source: PriceSource = "close"): IndicatorPoint[] {
   assertPeriod(period, "VWMA");
   const result: IndicatorPoint[] = [];
   for (let index = period - 1; index < candles.length; index += 1) {
@@ -99,7 +115,7 @@ export function volumeWeightedMovingAverage(candles: readonly Candle[], period: 
         completeVolume = false;
         break;
       }
-      priceVolume += candle.close * candle.volume;
+      priceVolume += priceFromCandle(candle, source) * candle.volume;
       totalVolume += candle.volume;
     }
     const candle = candles[index];
@@ -110,12 +126,16 @@ export function volumeWeightedMovingAverage(candles: readonly Candle[], period: 
   return result;
 }
 
-export function exponentialMovingAverage(candles: readonly Candle[], period: number): IndicatorPoint[] {
+export function exponentialMovingAverage(candles: readonly Candle[], period: number, source: PriceSource = "close"): IndicatorPoint[] {
   assertPeriod(period, "EMA");
   if (candles.length < period) return [];
   const multiplier = 2 / (period + 1);
   let seed = 0;
-  for (let index = 0; index < period; index += 1) seed += candles[index]?.close ?? 0;
+  for (let index = 0; index < period; index += 1) {
+    const candle = candles[index];
+    if (!candle) return [];
+    seed += priceFromCandle(candle, source);
+  }
   let previous = seed / period;
   const seedCandle = candles[period - 1];
   if (!seedCandle) return [];
@@ -123,13 +143,13 @@ export function exponentialMovingAverage(candles: readonly Candle[], period: num
   for (let index = period; index < candles.length; index += 1) {
     const candle = candles[index];
     if (!candle) continue;
-    previous = (candle.close - previous) * multiplier + previous;
+    previous = (priceFromCandle(candle, source) - previous) * multiplier + previous;
     result.push({ time: candle.time, value: previous });
   }
   return result;
 }
 
-export function relativeStrengthIndex(candles: readonly Candle[], period = 14): IndicatorPoint[] {
+export function relativeStrengthIndex(candles: readonly Candle[], period = 14, source: PriceSource = "close"): IndicatorPoint[] {
   assertPeriod(period, "RSI");
   if (candles.length <= period) return [];
   let averageGain = 0;
@@ -138,7 +158,7 @@ export function relativeStrengthIndex(candles: readonly Candle[], period = 14): 
     const current = candles[index];
     const previous = candles[index - 1];
     if (!current || !previous) return [];
-    const change = current.close - previous.close;
+    const change = priceFromCandle(current, source) - priceFromCandle(previous, source);
     averageGain += Math.max(0, change);
     averageLoss += Math.max(0, -change);
   }
@@ -186,13 +206,14 @@ export function movingAverageConvergenceDivergence(
   fastPeriod = 12,
   slowPeriod = 26,
   signalPeriod = 9,
+  source: PriceSource = "close",
 ): MacdPoint[] {
   assertPeriod(fastPeriod, "MACD fast");
   assertPeriod(slowPeriod, "MACD slow");
   assertPeriod(signalPeriod, "MACD signal");
   if (fastPeriod >= slowPeriod) throw new RangeError("MACD fast period must be smaller than slow period");
-  const fast = new Map(exponentialMovingAverage(candles, fastPeriod).map((point) => [point.time, point.value]));
-  const slow = new Map(exponentialMovingAverage(candles, slowPeriod).map((point) => [point.time, point.value]));
+  const fast = new Map(exponentialMovingAverage(candles, fastPeriod, source).map((point) => [point.time, point.value]));
+  const slow = new Map(exponentialMovingAverage(candles, slowPeriod, source).map((point) => [point.time, point.value]));
   const macd: IndicatorPoint[] = [];
   for (const candle of candles) {
     const fastValue = fast.get(candle.time);
@@ -218,6 +239,7 @@ export function bollingerBands(
   candles: readonly Candle[],
   period = 20,
   multiplier = 2,
+  source: PriceSource = "close",
 ): BollingerPoint[] {
   assertPeriod(period, "Bollinger");
   assertMultiplier(multiplier);
@@ -225,8 +247,8 @@ export function bollingerBands(
   for (let index = period - 1; index < candles.length; index += 1) {
     const window = candles.slice(index - period + 1, index + 1);
     if (window.length !== period) continue;
-    const middle = window.reduce((sum, candle) => sum + candle.close, 0) / period;
-    const variance = window.reduce((sum, candle) => sum + (candle.close - middle) ** 2, 0) / period;
+    const middle = window.reduce((sum, candle) => sum + priceFromCandle(candle, source), 0) / period;
+    const variance = window.reduce((sum, candle) => sum + (priceFromCandle(candle, source) - middle) ** 2, 0) / period;
     const deviation = Math.sqrt(variance);
     const candle = candles[index];
     if (!candle) continue;
@@ -271,6 +293,7 @@ export function stochasticOscillator(
   candles: readonly Candle[],
   period = 14,
   signalPeriod = 3,
+  source: PriceSource = "close",
 ): StochasticPoint[] {
   assertPeriod(period, "Stochastic");
   assertPeriod(signalPeriod, "Stochastic signal");
@@ -282,7 +305,8 @@ export function stochasticOscillator(
     const highestHigh = Math.max(...window.map((item) => item.high));
     const lowestLow = Math.min(...window.map((item) => item.low));
     const range = highestHigh - lowestLow;
-    const k = range === 0 ? 50 : ((candle.close - lowestLow) / range) * 100;
+    const sourceValue = priceFromCandle(candle, source);
+    const k = range === 0 ? 50 : ((sourceValue - lowestLow) / range) * 100;
     rawK.push({ time: candle.time, value: k });
   }
   const result: StochasticPoint[] = [];
@@ -329,7 +353,7 @@ export function onBalanceVolume(candles: readonly Candle[]): IndicatorPoint[] {
  * UTC-day anchored VWAP. It is unavailable when any input candle lacks provider volume.
  * Markets without published volume intentionally produce no VWAP points.
  */
-export function volumeWeightedAveragePrice(candles: readonly Candle[]): IndicatorPoint[] {
+export function volumeWeightedAveragePrice(candles: readonly Candle[], source: PriceSource = "hlc3"): IndicatorPoint[] {
   if (candles.length === 0 || candles.some((candle) =>
     candle.volume === undefined || !Number.isFinite(candle.volume) || candle.volume < 0)) return [];
   const result: IndicatorPoint[] = [];
@@ -345,9 +369,9 @@ export function volumeWeightedAveragePrice(candles: readonly Candle[]): Indicato
     }
     const volume = candle.volume;
     if (volume === undefined || volume <= 0) continue;
-    const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+    const sourcePrice = priceFromCandle(candle, source);
     cumulativeVolume += volume;
-    cumulativePriceVolume += typicalPrice * volume;
+    cumulativePriceVolume += sourcePrice * volume;
     result.push({ time: candle.time, value: cumulativePriceVolume / cumulativeVolume });
   }
   return result;
