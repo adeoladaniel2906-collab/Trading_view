@@ -83,7 +83,8 @@ export function MarketChart({
     loadDrawingHistory(drawingContext, getBrowserStorage()));
   const [historyContextKey, setHistoryContextKey] = useState(activeKey);
   const [dirtyContextKey, setDirtyContextKey] = useState<string | null>(null);
-  const [drawingStorageStatus, setDrawingStorageStatus] = useState<"saved" | "unavailable">("saved");
+  const [drawingStorageStatus, setDrawingStorageStatus] = useState<"saved" | "unavailable">(() =>
+    getBrowserStorage() ? "saved" : "unavailable");
   const [mode, setMode] = useState<DrawingMode>("none");
   const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
