@@ -1,6 +1,9 @@
 import type { Candle, Timeframe } from "@market/contracts";
 import type { CandleRequest, MarketDataProvider } from "./provider.js";
-import { parseLocalDateTimeToEpochSeconds } from "./time-zone.js";
+import {
+  parseLocalDateTimeToEpochSeconds,
+  TWELVE_DATA_FOREX_TIME_ZONE,
+} from "./time-zone.js";
 
 const intervalByTimeframe: Partial<Record<Timeframe, string>> = {
   "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
@@ -172,6 +175,9 @@ export class TwelveDataProvider implements MarketDataProvider {
     if (exchangeCalendarTimeframe &&
       (typeof exchangeTimeZone !== "string" || exchangeTimeZone.trim().length === 0)) {
       throw new Error("Twelve Data omitted exchange_timezone for an exchange-calendar timeframe");
+    }
+    if (exchangeCalendarTimeframe && exchangeTimeZone !== TWELVE_DATA_FOREX_TIME_ZONE) {
+      throw new Error("Twelve Data exchange timezone does not match the configured Forex live calendar");
     }
 
     return data.values.map((row) => {
