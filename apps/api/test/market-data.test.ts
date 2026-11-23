@@ -122,3 +122,35 @@ test("market-data route enforces the requested candle limit", async () => {
     await app.close();
   }
 });
+
+
+test("asset-routed historical candles select the provider for the requested market", async () => {
+  const cryptoProvider: MarketDataProvider = {
+    id: "binance-spot",
+    async getCandles(request) {
+      assert.equal(request.symbol, "BTCUSDT");
+      assert.equal(request.timeframe, "3m");
+      return validCandles;
+    },
+  };
+  const forexProvider: MarketDataProvider = {
+    id: "twelve-data",
+    async getCandles() {
+      return validCandles;
+    },
+  };
+  const app = await buildApp(config, {
+    marketDataProviders: { crypto: cryptoProvider, forex: forexProvider },
+  });
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/markets/crypto/BTCUSDT/candles?timeframe=3m&limit=100",
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().symbol, "BTCUSDT");
+    assert.equal(response.json().timeframe, "3m");
+  } finally {
+    await app.close();
+  }
+});
