@@ -303,8 +303,8 @@ export function App() {
               </button>
             ))}
             {watchlist[market].length === 0 ? <span className="tools-empty">No saved symbols</span> : null}
-          </div>
-          <div className="indicator-controls" role="group" aria-label="Chart indicators">
+          </nav>
+          <fieldset className="indicator-controls">
             <legend className="tools-label">Indicators</legend>
             <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
             <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
