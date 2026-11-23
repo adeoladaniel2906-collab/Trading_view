@@ -193,7 +193,7 @@ test("Binance adapter multiplexes a live kline stream and normalizes candle upda
   provider.close();
 });
 
-test("Twelve Data adapter keeps its API key in a server-side WebSocket header", () => {
+test("Twelve Data adapter keeps its API key server-side and aggregates Forex ticks into candles", () => {
   const sockets: FakeSocket[] = [];
   const provider = new TwelveDataLiveProvider("server-only-secret", (url, key) => {
     assert.equal(url, "wss://ws.twelvedata.com/v1/quotes/price");
@@ -215,26 +215,30 @@ test("Twelve Data adapter keeps its API key in a server-side WebSocket header", 
     action: "subscribe",
     params: { symbols: "EUR/USD" },
   });
-  socket.message({
-    event: "price",
-    symbol: "EUR/USD",
-    timestamp: 1_700_000_000,
-    price: 1.08,
-    bid: 1.079,
-    ask: 1.081,
-  });
+  socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_000, price: 1.08, bid: 1.079, ask: 1.081 });
+  socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_020, price: 1.085 });
+  socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_060, price: 1.082 });
 
-  assert.equal(events.length, 1);
-  assert.equal(events[0]?.kind, "price");
-  if (events[0]?.kind === "price") {
-    assert.equal(events[0].price, 1.08);
-    assert.equal(events[0].bid, 1.079);
+  assert.equal(events.length, 4);
+  const current = events[1];
+  assert.ok(current);
+  assert.equal(current.kind, "candle");
+  if (current.kind === "candle") {
+    assert.equal(current.market, "forex");
+    assert.equal(current.candle.open, 1.08);
+    assert.equal(current.candle.high, 1.085);
+    assert.equal(current.candle.low, 1.08);
+    assert.equal(current.candle.close, 1.085);
+    assert.equal(current.closed, false);
   }
+  const closed = events[2];
+  assert.ok(closed);
+  assert.equal(closed.kind, "candle");
+  if (closed.kind === "candle") assert.equal(closed.closed, true);
   assert.equal(socket.url.includes("server-only-secret"), false);
   unsubscribe();
   provider.close();
 });
-
 
 test("Binance live adapter maps every supported Spot interval", () => {
   const sockets: FakeSocket[] = [];
