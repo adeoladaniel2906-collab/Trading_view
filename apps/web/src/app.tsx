@@ -12,9 +12,10 @@ import { MarketChart } from "./features/chart/market-chart";
 const EMPTY_CANDLES: readonly Candle[] = [];
 const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
   crypto: ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"],
-  forex: ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD"],
+  forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"],
 };
 const TIMEFRAMES = timeframeSchema.options;
+const FOREX_TIMEFRAMES: readonly Timeframe[] = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w", "1M"];
 type FeedStatus = "loading" | "connecting" | "live" | "reconnecting" | "unavailable";
 
 function getApiOrigin(): string {
@@ -27,6 +28,7 @@ export function App() {
   const [market, setMarket] = useState<LiveMarketName>("crypto");
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState<Timeframe>("1m");
+  const availableTimeframes = market === "crypto" ? TIMEFRAMES : FOREX_TIMEFRAMES;
   const [candles, setCandles] = useState<readonly Candle[]>(EMPTY_CANDLES);
   const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
@@ -114,6 +116,7 @@ export function App() {
   const changeMarket = (nextMarket: LiveMarketName) => {
     setMarket(nextMarket);
     setSymbol(SYMBOLS[nextMarket][0] ?? "");
+    if (nextMarket === "forex" && !FOREX_TIMEFRAMES.includes(timeframe)) setTimeframe("1m");
   };
 
   return (
@@ -137,7 +140,7 @@ export function App() {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : symbol}</h2>
+            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : symbol.slice(0, 3) + "/" + symbol.slice(3)}</h2>
           </div>
           <span className="status-pill" aria-live="polite">
             <span className="status-dot" />
@@ -175,7 +178,7 @@ export function App() {
               value={timeframe}
               onChange={(event) => setTimeframe(event.currentTarget.value as Timeframe)}
             >
-              {TIMEFRAMES.map((interval) => (
+              {availableTimeframes.map((interval) => (
                 <option key={interval} value={interval}>{interval}</option>
               ))}
             </select>
@@ -185,7 +188,7 @@ export function App() {
           candles={candles}
           liveCandle={liveCandle}
           timeframe={timeframe}
-          chartLabel={market === "crypto" ? symbol : symbol.replace("/", " ")}
+          chartLabel={market === "crypto" ? symbol : symbol.slice(0, 3) + " " + symbol.slice(3)}
           emptyMessage={
             dataMessage ||
             (feedStatus === "reconnecting"
