@@ -9,6 +9,7 @@ import {
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type MouseEventParams,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -56,7 +57,7 @@ export function MarketChart({
   const pendingTrendPointRef = useRef<TrendPoint | null>(null);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>("none");
   const [drawingCount, setDrawingCount] = useState(0);
-  const [redoCount, setRedoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);\n  const [trendPointPending, setTrendPointPending] = useState(false);
 
   const renderDrawing = (record: DrawingRecord): RenderedDrawing | null => {
     const chart = chartRef.current;
@@ -213,7 +214,7 @@ export function MarketChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || drawingMode === "none") return;
-    const handleClick = (event: Parameters<IChartApi["subscribeClick"]>[0] extends (value: infer P) => void ? P : never) => {
+    const handleClick = (event: MouseEventParams<Time>) => {
       if (!event.point) return;
       const candleSeries = candleSeriesRef.current;
       if (!candleSeries) return;
@@ -238,6 +239,7 @@ export function MarketChart({
       const firstPoint = pendingTrendPointRef.current;
       if (!firstPoint) {
         pendingTrendPointRef.current = point;
+        setTrendPointPending(true);
         return;
       }
       if (firstPoint.time === point.time) return;
@@ -253,6 +255,7 @@ export function MarketChart({
         setRedoCount(0);
       }
       pendingTrendPointRef.current = null;
+      setTrendPointPending(false);
       setDrawingMode("none");
     };
     chart.subscribeClick(handleClick);
@@ -280,16 +283,17 @@ export function MarketChart({
 
   const cancelDrawing = () => {
     pendingTrendPointRef.current = null;
+    setTrendPointPending(false);
     setDrawingMode("none");
   };
 
   return (
     <div className="market-chart-shell">
-      <div className="drawing-toolbar" aria-label="Chart drawing tools">
+      <div className="drawing-toolbar" role="toolbar" aria-label="Chart drawing tools">
         <button type="button" onClick={() => setDrawingMode("horizontal")} aria-pressed={drawingMode === "horizontal"}>
           Horizontal level
         </button>
-        <button type="button" onClick={() => { pendingTrendPointRef.current = null; setDrawingMode("trendline"); }} aria-pressed={drawingMode === "trendline"}>
+        <button type="button" onClick={() => { pendingTrendPointRef.current = null; setTrendPointPending(false); setDrawingMode("trendline"); }} aria-pressed={drawingMode === "trendline"}>
           Trend line
         </button>
         <button type="button" onClick={undoDrawing} disabled={drawingCount === 0} aria-label="Undo drawing">
