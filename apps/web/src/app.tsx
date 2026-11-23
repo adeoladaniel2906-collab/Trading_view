@@ -1,200 +1,69 @@
-import { useEffect, useState } from "react";
-import {
-  feedHealthSchema,
-  liveMarketEventSchema,
-  marketCandlesResponseSchema,
-  marketRecoverySchema,
-  timeframeSchema,
-  type Candle,
-  type LiveMarketName,
-  type Timeframe,
-} from "@market/contracts";
-import { MarketChart } from "./features/chart/market-chart";
+import { useState } from "react";
+import type { LiveMarketName } from "@market/contracts";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
+import { ChartPanel } from "./features/workspace/chart-panel";
+import {
+  createWorkspaceState,
+  resizeWorkspace,
+  selectActivePanel,
+  updatePanel,
+  updatePanelSelection,
+  updateWorkspaceSync,
+  type PanelSelection,
+  type WorkspaceLayout,
+} from "./features/workspace/workspace-model";
 
-const EMPTY_CANDLES: readonly Candle[] = [];
-const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
-  crypto: ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"],
-  forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"],
-};
-const TIMEFRAMES = timeframeSchema.options;
-const FOREX_TIMEFRAMES: readonly Timeframe[] = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w", "1M"];
-type FeedStatus = "loading" | "connecting" | "live" | "stale" | "recovering" | "degraded" | "reconnecting" | "unavailable";
-
-function getApiOrigin(): string {
-  const configuredOrigin = import.meta.env.VITE_API_ORIGIN;
-  if (configuredOrigin) return configuredOrigin.replace(/\/$/, "");
-  return import.meta.env.DEV ? "http://127.0.0.1:3000" : window.location.origin;
-}
+const LAYOUT_OPTIONS: readonly WorkspaceLayout[] = [1, 2, 4];
 
 export function App() {
-  const [market, setMarket] = useState<LiveMarketName>("crypto");
-  const [symbol, setSymbol] = useState("BTCUSDT");
-  const [timeframe, setTimeframe] = useState<Timeframe>("1m");
-  const availableTimeframes = market === "crypto" ? TIMEFRAMES : FOREX_TIMEFRAMES;
-  const [candles, setCandles] = useState<readonly Candle[]>(EMPTY_CANDLES);
-  const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
-  const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
-  const [dataMessage, setDataMessage] = useState("Loading historical market candles.");
-  const [symbolSearch, setSymbolSearch] = useState("");
+  const [workspace, setWorkspace] = useState(() =>
+    createWorkspaceState(() => crypto.randomUUID()),
+  );
   const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>({
     crypto: ["BTCUSDT", "ETHUSDT"],
     forex: ["EURUSD", "GBPUSD"],
   });
-  const [showSma, setShowSma] = useState(false);
-  const [showEma, setShowEma] = useState(false);
-  const matchingSymbols = SYMBOLS[market].filter((item) =>
-    item.toLowerCase().includes(symbolSearch.trim().toLowerCase()),
-  );
-  const isWatched = watchlist[market].includes(symbol);
+  const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
+    ?? workspace.panels[0];
+
+  const changeLayout = (layout: WorkspaceLayout) => {
+    setWorkspace((current) => resizeWorkspace(current, layout, () => crypto.randomUUID()));
+  };
+
+  const changeSelection = (panelId: string, selection: PanelSelection) => {
+    setWorkspace((current) => updatePanelSelection(current, panelId, selection));
+  };
+
+  const changeIndicators = (
+    panelId: string,
+    update: Partial<Pick<(typeof workspace.panels)[number], "showSma" | "showEma">>,
+  ) => {
+    setWorkspace((current) => updatePanel(current, panelId, update));
+  };
+
   const toggleWatchlist = () => {
+    if (!activePanel) return;
+    const { market, symbol } = activePanel;
     setWatchlist((current) => ({
       ...current,
-      [market]: isWatched
+      [market]: current[market].includes(symbol)
         ? current[market].filter((item) => item !== symbol)
         : [...current[market], symbol],
     }));
   };
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    setCandles(EMPTY_CANDLES);
-    setLiveCandle(null);
-    setFeedStatus("loading");
-    setDataMessage("Loading historical market candles.");
-
-    const historyUrl = new URL(
-      `/v1/markets/${market}/${encodeURIComponent(symbol)}/candles?timeframe=${encodeURIComponent(timeframe)}&limit=500`,
-      getApiOrigin(),
-    );
-    void fetch(historyUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(market === "forex"
-          ? "Forex history is unavailable. Check the Twelve Data API key and display-license configuration."
-          : "Historical market data is unavailable.");
-        const parsed = marketCandlesResponseSchema.safeParse(await response.json());
-        if (!parsed.success || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) {
-          throw new Error("The historical market-data response failed validation.");
-        }
-        if (active) {
-          setCandles(parsed.data.candles);
-          setDataMessage("");
-        }
-      })
-      .catch((error: unknown) => {
-        if (active && !(error instanceof DOMException && error.name === "AbortError")) {
-          setDataMessage(error instanceof Error ? error.message : "Historical data is unavailable.");
-          setFeedStatus("unavailable");
-        }
-      });
-
-    const streamUrl = new URL(
-      `/v1/markets/${market}/${encodeURIComponent(symbol)}/stream?timeframe=${encodeURIComponent(timeframe)}`,
-      getApiOrigin(),
-    );
-    const source = new EventSource(streamUrl.toString());
-    let openedBefore = false;
-    source.onopen = () => {
-      if (!active) return;
-      const reconnect = openedBefore;
-      openedBefore = true;
-      setFeedStatus(reconnect ? "recovering" : "connecting");
-      if (reconnect) {
-        void fetch(historyUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
-          .then(async (response) => {
-            if (!response.ok) throw new Error("Historical reconciliation failed.");
-            const parsed = marketCandlesResponseSchema.safeParse(await response.json());
-            if (!parsed.success || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) {
-              throw new Error("Historical reconciliation response failed validation.");
-            }
-            if (active) {
-              setCandles((previous) => {
-                const merged = new Map(previous.map((candle) => [candle.time, candle]));
-                for (const candle of parsed.data.candles) merged.set(candle.time, candle);
-                return [...merged.values()].sort((a, b) => a.time - b.time);
-              });
-              setLiveCandle((current) => current && current.time >= (parsed.data.candles.at(-1)?.time ?? 0) ? current : null);
-              setFeedStatus("connecting");
-            }
-          })
-          .catch(() => { if (active) setFeedStatus("degraded"); });
-      }
-    };
-    source.onerror = () => { if (active) setFeedStatus("reconnecting"); };
-    const handleMarketData = (event: Event) => {
-      if (!active) return;
-      const message = event as MessageEvent<string>;
-      let payload: unknown;
-      try {
-        payload = JSON.parse(message.data);
-      } catch {
-        return;
-      }
-      const parsed = liveMarketEventSchema.safeParse(payload);
-      const expectedProvider = market === "crypto" ? "binance" : "twelve-data";
-      if (
-        !parsed.success ||
-        parsed.data.kind !== "candle" ||
-        parsed.data.market !== market ||
-        parsed.data.provider !== expectedProvider ||
-        parsed.data.symbol !== symbol ||
-        parsed.data.timeframe !== timeframe
-      ) return;
-      setLiveCandle(parsed.data.candle);
-      setFeedStatus("live");
-    };
-    source.addEventListener("market-data", handleMarketData);
-    source.addEventListener("feed-health", (event) => {
-      if (!active) return;
-      let payload: unknown;
-      try { payload = JSON.parse((event as MessageEvent<string>).data); } catch { return; }
-      const parsed = feedHealthSchema.safeParse(payload);
-      if (!parsed.success || parsed.data.market !== market || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) return;
-      if (parsed.data.state === "recovering") setFeedStatus("recovering");
-      else if (parsed.data.state === "stale") setFeedStatus("stale");
-      else if (parsed.data.state === "degraded") setFeedStatus("degraded");
-      else if (parsed.data.state === "connecting") setFeedStatus("connecting");
-      else if (parsed.data.state === "live") setFeedStatus("live");
+  const selectWatchlistSymbol = (symbol: string) => {
+    if (!activePanel) return;
+    changeSelection(activePanel.id, {
+      market: activePanel.market,
+      symbol,
+      timeframe: activePanel.timeframe,
     });
-    source.addEventListener("recovery", (event) => {
-      if (!active) return;
-      let payload: unknown;
-      try { payload = JSON.parse((event as MessageEvent<string>).data); } catch { return; }
-      const parsed = marketRecoverySchema.safeParse(payload);
-      if (!parsed.success || parsed.data.market !== market || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) return;
-      setCandles((previous) => {
-        const merged = new Map(previous.map((candle) => [candle.time, candle]));
-        for (const candle of parsed.data.candles) merged.set(candle.time, candle);
-        return [...merged.values()].sort((a, b) => a.time - b.time);
-      });
-      setLiveCandle((current) => current && current.time >= parsed.data.reconciledThrough ? current : null);
-      setFeedStatus(parsed.data.unresolvedFrom === null ? "live" : "degraded");
-    });
-
-    return () => {
-      active = false;
-      controller.abort();
-      source.close();
-    };
-  }, [market, symbol, timeframe]);
-
-  const statusLabel = {
-    loading: "Loading market data",
-    connecting: "Connecting",
-    live: market === "crypto" ? "Binance live" : "Twelve Data live",
-    stale: "Feed may be stale",
-    recovering: "Recovering market data",
-    degraded: "Data recovery incomplete",
-    reconnecting: "Reconnecting",
-    unavailable: "Data temporarily unavailable",
-  }[feedStatus];
-
-  const changeMarket = (nextMarket: LiveMarketName) => {
-    setMarket(nextMarket);
-    setSymbol(SYMBOLS[nextMarket][0] ?? "");
-    if (nextMarket === "forex" && !FOREX_TIMEFRAMES.includes(timeframe)) setTimeframe("1m");
   };
+
+  const isWatched = activePanel
+    ? watchlist[activePanel.market].includes(activePanel.symbol)
+    : false;
 
   return (
     <main className="workspace">
@@ -205,128 +74,108 @@ export function App() {
         </a>
         <span className="environment-label">Live market workspace</span>
       </header>
+
       <section className="intro" aria-labelledby="page-title">
         <p className="eyebrow">Independent market analysis</p>
         <h1 id="page-title">A clearer view of the markets.</h1>
         <p className="intro-copy">
-          Select a market, instrument and interval. The backend routes crypto to Binance Spot
-          and Forex to Twelve Data, keeping provider connections and credentials server-side.
+          Compare instruments across independent chart panels. The backend routes crypto to
+          Binance Spot and Forex to Twelve Data, keeping provider connections and credentials server-side.
         </p>
       </section>
+
       <section className="workspace-panel" aria-labelledby="chart-title">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : `${symbol.slice(0, 3)}/${symbol.slice(3)}`}</h2>
+            <h2 id="chart-title">Multi-chart analysis</h2>
           </div>
-          <span className="status-pill" aria-live="polite">
-            <span className="status-dot" />
-            {statusLabel}
-          </span>
+          <fieldset className="workspace-layout-controls"><legend>Chart layout</legend>
+            {LAYOUT_OPTIONS.map((layout) => (
+              <button
+                key={layout}
+                className="workspace-control"
+                type="button"
+                aria-pressed={workspace.layout === layout}
+                onClick={() => changeLayout(layout)}
+              >
+                {layout === 1 ? "1 chart" : `${layout} charts`}
+              </button>
+            ))}
+          </fieldset>
         </div>
-        <div className="chart-toolbar">
-          <div className="chart-market-controls">
-            <label className="timeframe-control">
-              <span>Find symbol</span>
-              <input
-                aria-label="Search supported symbols"
-                type="search"
-                value={symbolSearch}
-                onChange={(event) => {
-                  const next = event.currentTarget.value;
-                  setSymbolSearch(next);
-                  const exactMatch = SYMBOLS[market].find((item) => item.toLowerCase() === next.trim().toLowerCase());
-                  if (exactMatch) setSymbol(exactMatch);
-                }}
-                placeholder="Search symbols"
-                list="supported-market-symbols"
-              />
-              <datalist id="supported-market-symbols">
-                {matchingSymbols.map((item) => <option key={item} value={item} />)}
-              </datalist>
-            </label>
+
+        <div className="workspace-settings">
+          <span className="tools-label">Sync active panel</span>
+          <label>
+            <input
+              type="checkbox"
+              checked={workspace.sync.symbol}
+              onChange={(event) => setWorkspace((current) =>
+                updateWorkspaceSync(current, { symbol: event.currentTarget.checked }))}
+            />
+            Symbol
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={workspace.sync.timeframe}
+              onChange={(event) => setWorkspace((current) =>
+                updateWorkspaceSync(current, { timeframe: event.currentTarget.checked }))}
+            />
+            Timeframe
+          </label>
+          <span className="sync-note">Unsupported target intervals remain unchanged. Crosshair and drawing sync are not enabled yet.</span>
+        </div>
+
+        <div className="chart-workspace-tools">
+          <nav className="watchlist-strip" aria-label="Active panel watchlist">
+            <span className="tools-label">Watchlist</span>
+            {activePanel && watchlist[activePanel.market].map((symbol) => (
+              <button
+                key={symbol}
+                type="button"
+                className={symbol === activePanel.symbol ? "watchlist-item is-active" : "watchlist-item"}
+                onClick={() => selectWatchlistSymbol(symbol)}
+              >
+                {symbol}
+              </button>
+            ))}
             <button
               className="workspace-control"
               type="button"
               onClick={toggleWatchlist}
               aria-pressed={isWatched}
+              disabled={!activePanel}
             >
-              {isWatched ? "★ In watchlist" : "☆ Add to watchlist"}
+              {isWatched ? "★ Remove active symbol" : "☆ Add active symbol"}
             </button>
-          </div>
-          <div className="chart-market-controls">
-            <label className="timeframe-control">
-              <span>Market</span>
-              <select
-                aria-label="Market type"
-                value={market}
-                onChange={(event) => changeMarket(event.currentTarget.value as LiveMarketName)}
-              >
-                <option value="crypto">Crypto</option>
-                <option value="forex">Forex</option>
-              </select>
-            </label>
-            <label className="timeframe-control">
-              <span>Symbol</span>
-              <select
-                aria-label="Market symbol"
-                value={symbol}
-                onChange={(event) => setSymbol(event.currentTarget.value)}
-              >
-                {SYMBOLS[market].map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </label>
-          </div>
-          <label className="timeframe-control">
-            <span>Interval</span>
-            <select
-              aria-label="Chart timeframe"
-              value={timeframe}
-              onChange={(event) => setTimeframe(event.currentTarget.value as Timeframe)}
-            >
-              {availableTimeframes.map((interval) => (
-                <option key={interval} value={interval}>{interval}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="chart-workspace-tools">
-          <nav className="watchlist-strip" aria-label="Watchlist">
-            <span className="tools-label">Watchlist</span>
-            {watchlist[market].map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={item === symbol ? "watchlist-item is-active" : "watchlist-item"}
-                onClick={() => setSymbol(item)}
-              >
-                {item}
-              </button>
-            ))}
-            {watchlist[market].length === 0 ? <span className="tools-empty">No saved symbols</span> : null}
+            {activePanel && watchlist[activePanel.market].length === 0
+              ? <span className="tools-empty">No saved symbols for this market</span>
+              : null}
           </nav>
-          <fieldset className="indicator-controls">
-            <legend className="tools-label">Indicators</legend>
-            <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
-            <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
-          </fieldset>
         </div>
-        <MarketChart
-          candles={candles}
-          liveCandle={liveCandle}
-          timeframe={timeframe}
-          chartLabel={market === "crypto" ? symbol : `${symbol.slice(0, 3)} ${symbol.slice(3)}`}
-          showSma={showSma}
-          showEma={showEma}
-          emptyMessage={
-            dataMessage ||
-            (feedStatus === "reconnecting"
-              ? "The live feed is reconnecting. Waiting for the next verified update."
-              : "Waiting for the first verified market candle. No prices are simulated.")
-          }
-        />
+
+        <div className={`chart-grid chart-grid-${workspace.layout}`} data-layout={workspace.layout}>
+          {workspace.panels.map((panel) => (
+            <ChartPanel
+              key={panel.id}
+              panel={panel}
+              active={panel.id === workspace.activePanelId}
+              onActivate={() => setWorkspace((current) => selectActivePanel(current, panel.id))}
+              onSelectionChange={(selection) => changeSelection(panel.id, selection)}
+              onIndicatorChange={(update) => changeIndicators(panel.id, update)}
+              compact={workspace.layout !== 1}
+            />
+          ))}
+        </div>
+
+        <div className="workspace-active-note" aria-live="polite">
+          Active panel: {activePanel?.symbol ?? "None"} · Changes apply to the active panel unless synchronization is enabled.
+        </div>
         <RiskPlanner />
       </section>
+
       <footer className="footer">
         <span>Independent market analysis · No trading execution</span>
         <span>
