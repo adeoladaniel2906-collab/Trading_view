@@ -61,6 +61,36 @@ function parseRow(row: TwelveDataRow): Candle {
   return candle;
 }
 
+async function readLimitedBody(response: Response, maximumBytes: number): Promise<string> {
+  if (!response.body) throw new Error("Twelve Data response body is missing");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel();
+        throw new Error("Twelve Data response exceeded the size limit");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export class TwelveDataProvider implements MarketDataProvider {
   readonly id = "twelve-data";
   private readonly apiKey: string;
@@ -94,10 +124,7 @@ export class TwelveDataProvider implements MarketDataProvider {
     if (!response.ok) {
       throw new Error("Twelve Data request failed with status " + response.status);
     }
-    const responseText = await response.text();
-    if (responseText.length > 1_000_000) {
-      throw new Error("Twelve Data response exceeded the size limit");
-    }
+    const responseText = await readLimitedBody(response, 1_000_000);
     let payload: unknown;
     try {
       payload = JSON.parse(responseText);
