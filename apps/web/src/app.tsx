@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { LiveMarketName } from "@market/contracts";
+import type { IndicatorId } from "./features/chart/indicators";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
 import {
   createWorkspaceState,
   resizeWorkspace,
   selectActivePanel,
-  updatePanel,
+  updatePanelIndicator,
   updatePanelSelection,
   updateWorkspaceSync,
   type PanelSelection,
@@ -34,11 +35,8 @@ export function App() {
     setWorkspace((current) => updatePanelSelection(current, panelId, selection));
   };
 
-  const changeIndicators = (
-    panelId: string,
-    update: Partial<Pick<(typeof workspace.panels)[number], "showSma" | "showEma">>,
-  ) => {
-    setWorkspace((current) => updatePanel(current, panelId, update));
+  const changeIndicator = (panelId: string, indicator: IndicatorId, enabled: boolean) => {
+    setWorkspace((current) => updatePanelIndicator(current, panelId, indicator, enabled));
   };
 
   const toggleWatchlist = () => {
@@ -164,7 +162,7 @@ export function App() {
               active={panel.id === workspace.activePanelId}
               onActivate={() => setWorkspace((current) => selectActivePanel(current, panel.id))}
               onSelectionChange={(selection) => changeSelection(panel.id, selection)}
-              onIndicatorChange={(update) => changeIndicators(panel.id, update)}
+              onIndicatorChange={(indicator, enabled) => changeIndicator(panel.id, indicator, enabled)}
               compact={workspace.layout !== 1}
             />
           ))}

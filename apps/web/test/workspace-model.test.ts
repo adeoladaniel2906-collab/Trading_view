@@ -4,7 +4,7 @@ import {
   createWorkspaceState,
   resizeWorkspace,
   selectActivePanel,
-  updatePanel,
+  updatePanelIndicator,
   updatePanelSelection,
   updateWorkspaceSync,
 } from "../src/features/workspace/workspace-model.js";
@@ -25,11 +25,11 @@ test("workspace starts with one stable panel and synchronization disabled", () =
 test("layout expansion adds panels without replacing existing panel state", () => {
   const createId = ids();
   const initial = createWorkspaceState(createId);
-  const customized = updatePanel(initial, "panel-1", { showSma: true });
+  const customized = updatePanelIndicator(initial, "panel-1", "sma", true);
   const expanded = resizeWorkspace(customized, 4, createId);
   assert.equal(expanded.panels.length, 4);
   assert.equal(expanded.panels[0]?.id, "panel-1");
-  assert.equal(expanded.panels[0]?.showSma, true);
+  assert.equal(expanded.panels[0]?.indicators.sma, true);
   assert.deepEqual(expanded.panels.map((panel) => panel.id), ["panel-1", "panel-2", "panel-3", "panel-4"]);
 });
 
@@ -40,6 +40,15 @@ test("shrinking the layout preserves surviving panels and selects a valid active
   const shrunk = resizeWorkspace(selected, 2, createId);
   assert.deepEqual(shrunk.panels.map((panel) => panel.id), ["panel-1", "panel-2"]);
   assert.equal(shrunk.activePanelId, "panel-1");
+});
+
+test("indicator settings are isolated to the selected panel", () => {
+  const createId = ids();
+  const workspace = resizeWorkspace(createWorkspaceState(createId), 2, createId);
+  const changed = updatePanelIndicator(workspace, "panel-2", "macd", true);
+  assert.equal(changed.panels[0]?.indicators.macd, false);
+  assert.equal(changed.panels[1]?.indicators.macd, true);
+  assert.throws(() => updatePanelIndicator(workspace, "missing", "rsi", true), /not in the workspace/);
 });
 
 test("invalid layout and active panel IDs are rejected", () => {

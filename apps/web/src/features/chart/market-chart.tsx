@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
-  CandlestickSeries, ColorType, CrosshairMode, LineSeries, createChart,
+  CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
   type IChartApi, type ISeriesApi, type MouseEventParams, type Time, type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, LiveMarketName, Timeframe } from "@market/contracts";
@@ -8,7 +8,11 @@ import {
   DRAWING_COLORS, applyDrawingCommand, createDrawingHistory, redoDrawing, undoDrawing,
   type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind,
 } from "./drawings";
-import { exponentialMovingAverage, simpleMovingAverage } from "./indicators";
+import {
+  averageTrueRange, bollingerBands, exponentialMovingAverage, movingAverageConvergenceDivergence,
+  relativeStrengthIndex, simpleMovingAverage, volumeWeightedAveragePrice,
+  type IndicatorId,
+} from "./indicators";
 import "./market-chart.css";
 
 interface MarketChartProps {
@@ -19,11 +23,14 @@ interface MarketChartProps {
   readonly symbol: string;
   readonly chartLabel: string;
   readonly emptyMessage: string;
-  readonly showSma: boolean;
-  readonly showEma: boolean;
+  readonly indicators: Readonly<Record<IndicatorId, boolean>>;
   readonly compact?: boolean;
 }
 type DrawingMode = "none" | DrawingKind;
+interface IndicatorSeriesGroup {
+  readonly lines: ISeriesApi<"Line">[];
+  readonly histograms: ISeriesApi<"Histogram">[];
+}
 interface ChartPoint { readonly x: number; readonly y: number; }
 const DEFAULT_STYLE = { color: DRAWING_COLORS[0], lineWidth: 2 as const, lineStyle: "solid" as const };
 
@@ -50,13 +57,12 @@ function measurementLabel(drawing: ChartDrawing): string {
 
 export function MarketChart({
   candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
-  showSma, showEma, compact = false,
+  indicators, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const [history, setHistory] = useState<DrawingHistoryState>(() => createDrawingHistory());
   const [mode, setMode] = useState<DrawingMode>("none");
@@ -124,12 +130,6 @@ export function MarketChart({
       upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
       wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
     });
-    smaSeriesRef.current = chart.addSeries(LineSeries, {
-      color: "#d9f36a", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-    });
-    emaSeriesRef.current = chart.addSeries(LineSeries, {
-      color: "#a9b4c3", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-    });
     chartRef.current = chart;
     const refresh = () => setViewportRevision((value) => value + 1);
     chart.timeScale().subscribeVisibleLogicalRangeChange(refresh);
@@ -145,8 +145,7 @@ export function MarketChart({
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(refresh);
       chartRef.current = null;
       candleSeriesRef.current = null;
-      smaSeriesRef.current = null;
-      emaSeriesRef.current = null;
+      indicatorSeriesRef.current.clear();
       chart.remove();
     };
   }, []);
@@ -162,16 +161,83 @@ export function MarketChart({
   }, [candles]);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
     const byTime = new Map(candles.map((candle) => [candle.time, candle]));
     if (liveCandle) byTime.set(liveCandle.time, liveCandle);
     const data = [...byTime.values()].sort((a, b) => a.time - b.time);
-    smaSeriesRef.current?.setData(showSma ? simpleMovingAverage(data, 20).map((point) => ({
-      time: point.time as UTCTimestamp as Time, value: point.value,
-    })) : []);
-    emaSeriesRef.current?.setData(showEma ? exponentialMovingAverage(data, 20).map((point) => ({
-      time: point.time as UTCTimestamp as Time, value: point.value,
-    })) : []);
-  }, [candles, liveCandle, showSma, showEma]);
+    const lineOptions = (color: string, lineStyle = LineStyle.Solid) => ({
+      color, lineWidth: 2 as const, lineStyle, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+    const createGroup = (id: IndicatorId): IndicatorSeriesGroup => {
+      const paneIndex = ["sma", "ema", "bollinger", "vwap"].includes(id) ? 0 : chart.panes().length;
+      const lines: ISeriesApi<"Line">[] = [];
+      const histograms: ISeriesApi<"Histogram">[] = [];
+      if (id === "sma") lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
+      if (id === "ema") lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
+      if (id === "bollinger") {
+        lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3", LineStyle.Dashed), paneIndex));
+        lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
+        lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3", LineStyle.Dashed), paneIndex));
+      }
+      if (id === "vwap") lines.push(chart.addSeries(LineSeries, lineOptions("#26a69a"), paneIndex));
+      if (id === "rsi") lines.push(chart.addSeries(LineSeries, {
+        ...lineOptions("#d9f36a"), priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+      }, paneIndex));
+      if (id === "macd") {
+        lines.push(chart.addSeries(LineSeries, lineOptions("#d9f36a"), paneIndex));
+        lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
+        histograms.push(chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, paneIndex));
+      }
+      if (id === "atr") lines.push(chart.addSeries(LineSeries, lineOptions("#a9b4c3"), paneIndex));
+      return { lines, histograms };
+    };
+    const setLine = (series: ISeriesApi<"Line"> | undefined, points: readonly { time: number; value: number }[]) => {
+      series?.setData(points.map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value })));
+    };
+
+    const ids: readonly IndicatorId[] = ["sma", "ema", "bollinger", "vwap", "rsi", "macd", "atr"];
+    for (const id of ids) {
+      const enabled = indicators[id];
+      let group = indicatorSeriesRef.current.get(id);
+      if (!enabled && group) {
+        for (const series of group.lines) chart.removeSeries(series);
+        for (const series of group.histograms) chart.removeSeries(series);
+        indicatorSeriesRef.current.delete(id);
+        continue;
+      }
+      if (!enabled) continue;
+      if (!group) {
+        group = createGroup(id);
+        indicatorSeriesRef.current.set(id, group);
+      }
+      if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, 20));
+      if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, 20));
+      if (id === "bollinger") {
+        const points = bollingerBands(data, 20, 2);
+        const upper = points.map((point) => ({ time: point.time, value: point.upper }));
+        const middle = points.map((point) => ({ time: point.time, value: point.middle }));
+        const lower = points.map((point) => ({ time: point.time, value: point.lower }));
+        setLine(group.lines[0], upper);
+        setLine(group.lines[1], middle);
+        setLine(group.lines[2], lower);
+      }
+      if (id === "vwap") setLine(group.lines[0], volumeWeightedAveragePrice(data));
+      if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, 14));
+      if (id === "atr") setLine(group.lines[0], averageTrueRange(data, 14));
+      if (id === "macd") {
+        const points = movingAverageConvergenceDivergence(data, 12, 26, 9);
+        setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.macd })));
+        setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.signal })));
+        group.histograms[0]?.setData(points.map((point) => ({
+          time: point.time as UTCTimestamp as Time,
+          value: point.histogram,
+          color: point.histogram >= 0 ? "#26a69a" : "#ef5350",
+        })));
+      }
+    }
+  }, [candles, liveCandle, indicators]);
 
   useEffect(() => {
     chartRef.current?.applyOptions({ timeScale: { secondsVisible: timeframe === "1s" } });
