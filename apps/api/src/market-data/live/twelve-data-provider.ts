@@ -14,8 +14,8 @@ interface TwelveDataMessage {
 interface Channel {
   readonly request: LiveMarketRequest;
   readonly listeners: Set<LiveMarketListener>;
-  candle?: Candle;
-  lastTickTime?: number;
+  candle: Candle | undefined;
+  lastTickTime: number | undefined;
 }
 
 const intervalSeconds: Partial<Record<Timeframe, number>> = {
@@ -73,7 +73,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
       if (!activeSymbols.has(symbol) && activeSymbols.size >= this.maximumSymbols) {
         throw new Error("Twelve Data live-subscription capacity has been reached");
       }
-      channel = { request: { ...request, symbol }, listeners: new Set() };
+      channel = { request: { ...request, symbol }, listeners: new Set(), candle: undefined, lastTickTime: undefined };
       this.channels.set(key, channel);
       if (!activeSymbols.has(symbol) && this.socket?.readyState === WebSocket.OPEN) {
         this.send({ action: "subscribe", params: { symbols: providerSymbol } });
