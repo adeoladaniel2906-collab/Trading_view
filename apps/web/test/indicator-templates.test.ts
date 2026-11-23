@@ -74,11 +74,14 @@ test("upsert replaces by ID, prepends new records and delete removes only the se
 test("template collection enforces its bounded size", () => {
   const templates = Array.from({ length: MAX_INDICATOR_TEMPLATES }, (_, index) =>
     makeTemplate(`template-${index}`, `Template ${index}`));
-  assert.equal(upsertIndicatorTemplate(templates, makeTemplate("overflow", "Overflow")).length, MAX_INDICATOR_TEMPLATES + 1);
-  assert.throws(() => writeIndicatorTemplates(new MemoryStorage(), [
+  assert.throws(() => upsertIndicatorTemplate(
+    templates,
+    makeTemplate("overflow", "Overflow"),
+  ), /limit reached/);
+  assert.equal(writeIndicatorTemplates(new MemoryStorage(), [
     ...templates,
     makeTemplate("overflow", "Overflow"),
-  ]), /not/);
+  ]), false);
 });
 
 test("storage round-trips valid templates and preserves unknown future formats", () => {
