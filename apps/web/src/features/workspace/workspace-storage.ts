@@ -64,12 +64,12 @@ function parseWorkspace(value: unknown): WorkspaceState {
       rawPanel.id.length < 1 || rawPanel.id.length > 128) {
       throw new TypeError("Saved chart panel identity is invalid");
     }
-    const market = rawPanel.market;
+    let market: LiveMarketName;
+    if (rawPanel.market === "crypto") market = "crypto";
+    else if (rawPanel.market === "forex") market = "forex";
+    else throw new TypeError("Saved chart panel market is invalid");
     const symbol = rawPanel.symbol;
     const timeframe = rawPanel.timeframe;
-    if (market !== "crypto" && market !== "forex") {
-      throw new TypeError("Saved chart panel market is invalid");
-    }
     if (typeof symbol !== "string" || typeof timeframe !== "string") {
       throw new TypeError("Saved chart panel selection is invalid");
     }
@@ -109,9 +109,10 @@ function parseWorkspace(value: unknown): WorkspaceState {
     !panels.some((panel) => panel.id === value.activePanelId)) {
     throw new TypeError("Saved active chart panel does not exist");
   }
-  if (!isRecord(value.sync) ||
-    ["symbol", "timeframe", "crosshair", "drawings"].some((key) => typeof value.sync?.[key] !== "boolean") ||
-    Object.keys(value.sync).some((key) => !["symbol", "timeframe", "crosshair", "drawings"].includes(key))) {
+  const rawSync = value.sync;
+  if (!isRecord(rawSync) ||
+    ["symbol", "timeframe", "crosshair", "drawings"].some((key) => typeof rawSync[key] !== "boolean") ||
+    Object.keys(rawSync).some((key) => !["symbol", "timeframe", "crosshair", "drawings"].includes(key))) {
     throw new TypeError("Saved workspace synchronization settings are invalid");
   }
   return {
@@ -119,10 +120,10 @@ function parseWorkspace(value: unknown): WorkspaceState {
     activePanelId: value.activePanelId,
     panels,
     sync: {
-      symbol: value.sync.symbol as boolean,
-      timeframe: value.sync.timeframe as boolean,
-      crosshair: value.sync.crosshair as boolean,
-      drawings: value.sync.drawings as boolean,
+      symbol: rawSync.symbol as boolean,
+      timeframe: rawSync.timeframe as boolean,
+      crosshair: rawSync.crosshair as boolean,
+      drawings: rawSync.drawings as boolean,
     },
   };
 }
