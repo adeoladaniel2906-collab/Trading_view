@@ -30,6 +30,7 @@ export function App() {
         <div className="chart-placeholder" role="status">
           <div className="placeholder-icon" aria-hidden="true">
             <svg viewBox="0 0 48 48" fill="none">
+              <title>Chart icon</title>
               <path d="M7 37.5h34M11 31V18m9 13V10m9 21V22m9 9V14" />
               <path d="M7 9.5h34" />
             </svg>
