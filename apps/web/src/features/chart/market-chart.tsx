@@ -111,6 +111,12 @@ export function MarketChart({
     if (liveCandle) byTime.set(liveCandle.time, liveCandle);
     return [...byTime.values()].sort((left, right) => left.time - right.time);
   }, [candles, liveCandle]);
+  const crosshairTimeRef = useRef<number | null>(crosshairTime);
+  const syncCrosshairRef = useRef(syncCrosshair);
+  const availableCandlesRef = useRef(availableCandles);
+  crosshairTimeRef.current = crosshairTime;
+  syncCrosshairRef.current = syncCrosshair;
+  availableCandlesRef.current = availableCandles;
 
   useEffect(() => {
     const current = historiesRef.current.get(activeKey) ??
@@ -306,7 +312,23 @@ export function MarketChart({
         wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
       });
     }
-    setPriceSeriesRevision((revision) => revision + 1);
+    const series = priceSeriesRef.current;
+    const requestedTime = crosshairTimeRef.current;
+    if (series && syncCrosshairRef.current && requestedTime !== null) {
+      const target = nearestCrosshairTarget(availableCandlesRef.current, requestedTime);
+      if (target) {
+        isApplyingCrosshairRef.current = true;
+        chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
+        isApplyingCrosshairRef.current = false;
+        lastAppliedCrosshairTimeRef.current = target.time;
+      } else {
+        chart.clearCrosshairPosition();
+        lastAppliedCrosshairTimeRef.current = null;
+      }
+    } else {
+      if (lastAppliedCrosshairTimeRef.current !== null) chart.clearCrosshairPosition();
+      lastAppliedCrosshairTimeRef.current = null;
+    }
   }, [chartType]);
 
   useEffect(() => {
@@ -328,9 +350,8 @@ export function MarketChart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || priceSeriesRevision === 0) return;
     const series = priceSeriesRef.current;
-    if (!series) return;
+    if (!chart || !series) return;
     if (!syncCrosshair || crosshairTime === null) {
       if (lastAppliedCrosshairTimeRef.current !== null) {
         isApplyingCrosshairRef.current = true;
@@ -353,7 +374,7 @@ export function MarketChart({
     chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
     isApplyingCrosshairRef.current = false;
     lastAppliedCrosshairTimeRef.current = target.time;
-  }, [availableCandles, crosshairTime, priceSeriesRevision, syncCrosshair]);
+  }, [availableCandles, crosshairTime, syncCrosshair]);
 
   useEffect(() => {
     const series = priceSeriesRef.current;
