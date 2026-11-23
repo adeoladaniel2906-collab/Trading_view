@@ -10,6 +10,7 @@ import {
   type Timeframe,
 } from "@market/contracts";
 import { MarketChart } from "./features/chart/market-chart";
+import { RiskPlanner } from "./features/trading/risk-planner";
 
 const EMPTY_CANDLES: readonly Candle[] = [];
 const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
@@ -324,6 +325,7 @@ export function App() {
               : "Waiting for the first verified market candle. No prices are simulated.")
           }
         />
+        <RiskPlanner />
       </section>
       <footer className="footer">
         <span>Independent market analysis · No trading execution</span>
