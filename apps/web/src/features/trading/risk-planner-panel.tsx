@@ -181,7 +181,7 @@ export function RiskPlanner({ market, symbol, timeframe }: RiskPlannerProps) {
         <NumberField label="Point value / unit" value={input.pointValue} onChange={(value) => update("pointValue", value)} />
         <NumberField label="Quantity step" value={input.quantityStep} onChange={(value) => update("quantityStep", value)} />
         <NumberField label="Minimum quantity" value={input.minimumQuantity} onChange={(value) => update("minimumQuantity", value)} />
-        <NumberField label="Round-trip fee rate" value={input.roundTripFeeRate ?? 0} onChange={(value) => update("roundTripFeeRate", value)} step="0.0001" />
+        <NumberField label="Round-trip fee rate (decimal)" value={input.roundTripFeeRate ?? 0} onChange={(value) => update("roundTripFeeRate", value)} step="0.0001" />
       </div>
       {result.error ? (
         <p className="risk-planner-error" role="alert">{result.error}</p>
@@ -203,7 +203,7 @@ export function RiskPlanner({ market, symbol, timeframe }: RiskPlannerProps) {
         <div className="trade-journal-heading">
           <div>
             <h4 id="trade-journal-title">Paper trade journal</h4>
-            <p>{market.toUpperCase()} · {symbol} · {timeframe} · No broker execution</p>
+            <p>New plans: {market.toUpperCase()} · {symbol} · {timeframe}. Journal includes all saved symbols.</p>
           </div>
           <span>{journal.length} / 500 records</span>
         </div>
@@ -225,7 +225,7 @@ export function RiskPlanner({ market, symbol, timeframe }: RiskPlannerProps) {
             {journal.map((entry) => (
               <article className="trade-journal-entry" key={entry.id}>
                 <div className="trade-journal-entry-heading">
-                  <strong>{entry.symbol} · {entry.side.toUpperCase()}</strong>
+                  <strong>{entry.market.toUpperCase()} · {entry.symbol} · {entry.side.toUpperCase()}</strong>
                   <span className={`trade-journal-status is-${entry.status}`}>{entry.status}</span>
                 </div>
                 <div className="trade-journal-entry-data">
