@@ -328,8 +328,9 @@ export function MarketChart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    const series = priceSeriesSnapshot;
-    if (!chart || !series) return;
+    if (!chart || priceSeriesSnapshot.revision === 0) return;
+    const series = priceSeriesSnapshot.series;
+    if (!series) return;
     if (!syncCrosshair || crosshairTime === null) {
       if (lastAppliedCrosshairTimeRef.current !== null) {
         isApplyingCrosshairRef.current = true;
