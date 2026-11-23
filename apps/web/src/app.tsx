@@ -105,7 +105,7 @@ export function App() {
     }
     try {
       const template = createIndicatorTemplate(name, panel, crypto.randomUUID(), Date.now());
-      setIndicatorTemplates((current) => upsertIndicatorTemplate(current, template));
+      setIndicatorTemplates(upsertIndicatorTemplate(indicatorTemplates, template));
       setTemplateActionStatus(`Saved “${template.name}”.`);
       return template.id;
     } catch (cause) {
