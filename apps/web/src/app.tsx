@@ -35,6 +35,25 @@ export function App() {
   const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
   const [dataMessage, setDataMessage] = useState("Loading historical market candles.");
+  const [symbolSearch, setSymbolSearch] = useState("");
+  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>({
+    crypto: ["BTCUSDT", "ETHUSDT"],
+    forex: ["EURUSD", "GBPUSD"],
+  });
+  const [showSma, setShowSma] = useState(false);
+  const [showEma, setShowEma] = useState(false);
+  const matchingSymbols = SYMBOLS[market].filter((item) =>
+    item.toLowerCase().includes(symbolSearch.trim().toLowerCase()),
+  );
+  const isWatched = watchlist[market].includes(symbol);
+  const toggleWatchlist = () => {
+    setWatchlist((current) => ({
+      ...current,
+      [market]: isWatched
+        ? current[market].filter((item) => item !== symbol)
+        : [...current[market], symbol],
+    }));
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -205,6 +224,30 @@ export function App() {
           </span>
         </div>
         <div className="chart-toolbar">
+          <div className="chart-market-controls">
+            <label className="timeframe-control">
+              <span>Find symbol</span>
+              <input
+                aria-label="Search supported symbols"
+                type="search"
+                value={symbolSearch}
+                onChange={(event) => setSymbolSearch(event.currentTarget.value)}
+                placeholder="Search symbols"
+                list="supported-market-symbols"
+              />
+              <datalist id="supported-market-symbols">
+                {matchingSymbols.map((item) => <option key={item} value={item} />)}
+              </datalist>
+            </label>
+            <button
+              className="workspace-control"
+              type="button"
+              onClick={toggleWatchlist}
+              aria-pressed={isWatched}
+            >
+              {isWatched ? "★ In watchlist" : "☆ Add to watchlist"}
+            </button>
+          </div>
           <div className="chart-market-controls">
             <label className="timeframe-control">
               <span>Market</span>
