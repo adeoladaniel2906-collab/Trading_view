@@ -9,5 +9,6 @@ export interface CandleRequest {
 export interface MarketDataProvider {
   /** Stable, non-secret provider identifier for diagnostics. */
   readonly id: string;
+  supportsTimeframe?(timeframe: Timeframe): boolean;
   getCandles(request: CandleRequest, signal: AbortSignal): Promise<readonly Candle[]>;
 }
