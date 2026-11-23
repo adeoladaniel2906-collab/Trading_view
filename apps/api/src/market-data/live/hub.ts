@@ -48,7 +48,13 @@ export class LiveMarketDataHub {
       const listeners = new Set<LiveMarketListener>();
       const unsubscribe = provider.subscribe(request, (event: LiveMarketEvent) => {
         const validated = liveMarketEventSchema.safeParse(event);
-        if (!validated.success) return;
+        if (
+          !validated.success ||
+          validated.data.provider !== provider.id ||
+          validated.data.market !== request.market ||
+          validated.data.symbol !== request.symbol ||
+          (validated.data.kind === "candle" && validated.data.timeframe !== request.timeframe)
+        ) return;
         for (const subscriber of [...listeners]) {
           try {
             subscriber(event);
