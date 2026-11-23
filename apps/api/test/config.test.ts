@@ -44,3 +44,13 @@ test("production rejects non-HTTPS browser origins", () => {
     /HTTPS origins only/,
   );
 });
+
+
+test("default local CORS origins include both localhost and loopback Vite addresses", () => {
+  const { WEB_ORIGINS: _ignored, ...withoutOrigins } = baseEnvironment;
+  const config = loadConfig(withoutOrigins);
+  assert.deepEqual(config.WEB_ORIGINS, [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]);
+});
