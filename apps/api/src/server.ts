@@ -1,34 +1,23 @@
+import app from "./app.js";
 import { loadConfig } from "./config/env.js";
-import { buildApp } from "./app.js";
-import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
-import { BinanceMarketDataProvider } from "./market-data/binance-provider.js";
-import { BinanceLiveProvider } from "./market-data/live/binance-provider.js";
-import { TwelveDataLiveProvider } from "./market-data/live/twelve-data-provider.js";
-import { LiveMarketDataHub } from "./market-data/live/hub.js";
-import type { LiveMarketDataProvider } from "./market-data/live/provider.js";
+
+const config = loadConfig();
 
 async function start(): Promise<void> {
-  const config = loadConfig();
-  const marketDataProvider =
-    config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
-      ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
-      : undefined;
-  const liveProviders: LiveMarketDataProvider[] = [new BinanceLiveProvider()];
-  const marketDataProviders = { crypto: new BinanceMarketDataProvider(), ...(marketDataProvider ? { forex: marketDataProvider } : {}) };
-  if (config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED) {
-    liveProviders.push(new TwelveDataLiveProvider(config.TWELVE_DATA_API_KEY));
-  }
-  const liveMarketDataHub = new LiveMarketDataHub(liveProviders);
-  const app = await buildApp(config, {
-    ...(marketDataProvider ? { marketDataProvider } : {}),
-    marketDataProviders,
-    liveMarketDataHub,
-  });
-
   try {
     const address = await app.listen({ host: config.HOST, port: config.PORT });
     app.log.info(
-      { address, marketDataProvider: marketDataProvider?.id ?? "disabled", liveProviders: liveProviders.map((provider) => provider.id) },
+      {
+        address,
+        marketDataProvider:
+          config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
+            ? "twelvedata"
+            : "disabled",
+        liveProviders:
+          config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
+            ? ["binance", "twelvedata"]
+            : ["binance"],
+      },
       "Market API listening",
     );
   } catch (error) {
@@ -53,7 +42,7 @@ async function start(): Promise<void> {
 
 start().catch((error: unknown) => {
   process.stderr.write(
-    "Fatal startup error: " + (error instanceof Error ? error.message : "Unknown error") + "\n",
+    `Fatal startup error: ${error instanceof Error ? error.message : "Unknown error"}\n`,
   );
   process.exitCode = 1;
 });
