@@ -28,6 +28,7 @@ interface MarketChartProps {
   readonly chartLabel: string;
   readonly emptyMessage: string;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
+  readonly indicatorParameters: import("../workspace/workspace-model").IndicatorParameters;
   readonly chartType: ChartType;
   readonly compact?: boolean;
 }
@@ -70,7 +71,7 @@ function measurementLabel(drawing: ChartDrawing): string {
 
 export function MarketChart({
   candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
-  indicators, chartType, compact = false,
+  indicators, indicatorParameters, chartType, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -391,12 +392,12 @@ export function MarketChart({
         group = createGroup(id);
         indicatorSeriesRef.current.set(id, group);
       }
-      if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, 20));
-      if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, 20));
-      if (id === "wma") setLine(group.lines[0], weightedMovingAverage(data, 20));
-      if (id === "vwma") setLine(group.lines[0], volumeWeightedMovingAverage(data, 20));
+      if (id === "sma") setLine(group.lines[0], simpleMovingAverage(data, indicatorParameters.smaPeriod));
+      if (id === "ema") setLine(group.lines[0], exponentialMovingAverage(data, indicatorParameters.emaPeriod));
+      if (id === "wma") setLine(group.lines[0], weightedMovingAverage(data, indicatorParameters.wmaPeriod));
+      if (id === "vwma") setLine(group.lines[0], volumeWeightedMovingAverage(data, indicatorParameters.vwmaPeriod));
       if (id === "bollinger") {
-        const points = bollingerBands(data, 20, 2);
+        const points = bollingerBands(data, indicatorParameters.bollingerPeriod, indicatorParameters.bollingerMultiplier);
         const upper = points.map((point) => ({ time: point.time, value: point.upper }));
         const middle = points.map((point) => ({ time: point.time, value: point.middle }));
         const lower = points.map((point) => ({ time: point.time, value: point.lower }));
@@ -405,16 +406,16 @@ export function MarketChart({
         setLine(group.lines[2], lower);
       }
       if (id === "vwap") setLine(group.lines[0], volumeWeightedAveragePrice(data));
-      if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, 14));
-      if (id === "atr") setLine(group.lines[0], averageTrueRange(data, 14));
+      if (id === "rsi") setLine(group.lines[0], relativeStrengthIndex(data, indicatorParameters.rsiPeriod));
+      if (id === "atr") setLine(group.lines[0], averageTrueRange(data, indicatorParameters.atrPeriod));
       if (id === "stochastic") {
-        const points = stochasticOscillator(data, 14, 3);
+        const points = stochasticOscillator(data, indicatorParameters.stochasticPeriod, indicatorParameters.stochasticSignalPeriod);
         setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.k })));
         setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.d })));
       }
       if (id === "obv") setLine(group.lines[0], onBalanceVolume(data));
       if (id === "macd") {
-        const points = movingAverageConvergenceDivergence(data, 12, 26, 9);
+        const points = movingAverageConvergenceDivergence(data, indicatorParameters.macdFastPeriod, indicatorParameters.macdSlowPeriod, indicatorParameters.macdSignalPeriod);
         setLine(group.lines[0], points.map((point) => ({ time: point.time, value: point.macd })));
         setLine(group.lines[1], points.map((point) => ({ time: point.time, value: point.signal })));
         group.histograms[0]?.setData(points.map((point) => ({
@@ -424,7 +425,7 @@ export function MarketChart({
         })));
       }
     }
-  }, [candles, liveCandle, indicators]);
+  }, [candles, liveCandle, indicators, indicatorParameters]);
 
   useEffect(() => {
     chartRef.current?.applyOptions({ timeScale: { secondsVisible: timeframe === "1s" } });
