@@ -5,11 +5,14 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import type { AppConfig } from "./config/env.js";
 import type { MarketDataProvider } from "./market-data/provider.js";
+import type { LiveMarketDataHub } from "./market-data/live/hub.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerMarketDataRoutes } from "./routes/market-data.js";
+import { registerLiveMarketDataRoutes } from "./routes/live-market-data.js";
 
 interface AppDependencies {
   readonly marketDataProvider?: MarketDataProvider;
+  readonly liveMarketDataHub?: LiveMarketDataHub;
 }
 
 export async function buildApp(config: AppConfig, dependencies: AppDependencies = {}) {
@@ -87,5 +90,9 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
 
   await registerHealthRoutes(app);
   await registerMarketDataRoutes(app, dependencies.marketDataProvider);
+  await registerLiveMarketDataRoutes(app, dependencies.liveMarketDataHub);
+  if (dependencies.liveMarketDataHub) {
+    app.addHook("onClose", async () => dependencies.liveMarketDataHub?.close());
+  }
   return app;
 }
