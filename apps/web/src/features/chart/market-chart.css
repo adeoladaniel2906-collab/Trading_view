@@ -101,3 +101,120 @@
   flex-basis: 100%;
   margin-left: 0;
 }
+
+
+.market-chart-stage {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.drawing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.drawing-overlay line,
+.drawing-overlay rect {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.drawing-overlay text {
+  user-select: none;
+}
+.drawing-object-tree {
+  border-top: 1px solid #2a3544;
+  background: #151c26;
+  color: #b8c4d3;
+}
+.drawing-object-tree-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  color: #e8edf5;
+  font-size: 11px;
+}
+.drawing-object-tree button {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid #344253;
+  border-radius: 5px;
+  background: #1c2633;
+  color: #b8c4d3;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.drawing-object-tree button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.drawing-object-tree button:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.drawing-object-tree ul {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 0 10px 10px;
+  list-style: none;
+}
+.drawing-object-tree li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.drawing-object-tree li.is-selected {
+  border-color: #d9f36a;
+  background: #1c2633;
+}
+.drawing-object-select {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  text-align: left;
+}
+.drawing-object-select span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawing-object-select small {
+  margin-left: auto;
+  color: #8491a2;
+  white-space: nowrap;
+}
+.drawing-object-color {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+@media (max-width: 640px) {
+  .drawing-object-tree li {
+    flex-wrap: wrap;
+  }
+  .drawing-object-select {
+    flex-basis: 100%;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
