@@ -23,11 +23,12 @@ export function App() {
       `/v1/markets/crypto/${MARKET_SYMBOL}/stream?timeframe=${MARKET_TIMEFRAME}`,
       getApiOrigin(),
     );
-    const source = new EventSource(streamUrl);
+    const source = new EventSource(streamUrl.toString());
 
     source.onopen = () => setFeedStatus("live");
     source.onerror = () => setFeedStatus("reconnecting");
-    source.addEventListener("market-data", (message: MessageEvent<string>) => {
+    const handleMarketData = (event: Event) => {
+      const message = event as MessageEvent<string>;
       let payload: unknown;
       try {
         payload = JSON.parse(message.data);
@@ -47,7 +48,8 @@ export function App() {
 
       setLiveCandle(parsed.data.candle);
       setFeedStatus("live");
-    });
+    };
+    source.addEventListener("market-data", handleMarketData);
 
     return () => source.close();
   }, []);
