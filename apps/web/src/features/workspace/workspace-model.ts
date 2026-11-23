@@ -1,4 +1,5 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
+import type { IndicatorId } from "../chart/indicators";
 
 export type WorkspaceLayout = 1 | 2 | 4;
 
@@ -7,8 +8,7 @@ export interface ChartPanelState {
   readonly market: LiveMarketName;
   readonly symbol: string;
   readonly timeframe: Timeframe;
-  readonly showSma: boolean;
-  readonly showEma: boolean;
+  readonly indicators: Readonly<Record<IndicatorId, boolean>>;
 }
 
 export interface WorkspaceSyncSettings {
@@ -50,8 +50,7 @@ function defaultPanel(id: string): ChartPanelState {
     market: "crypto",
     symbol: "BTCUSDT",
     timeframe: "1m",
-    showSma: false,
-    showEma: false,
+    indicators: { sma: false, ema: false, rsi: false, macd: false, bollinger: false, atr: false, vwap: false },
   };
 }
 
@@ -97,17 +96,20 @@ export function selectActivePanel(state: WorkspaceState, panelId: string): Works
   return { ...state, activePanelId: panelId };
 }
 
-export function updatePanel(
+export function updatePanelIndicator(
   state: WorkspaceState,
   panelId: string,
-  update: Partial<Pick<ChartPanelState, "showSma" | "showEma">>,
+  indicator: IndicatorId,
+  enabled: boolean,
 ): WorkspaceState {
   if (!state.panels.some((panel) => panel.id === panelId)) {
     throw new RangeError("Cannot update a panel that is not in the workspace");
   }
   return {
     ...state,
-    panels: state.panels.map((panel) => panel.id === panelId ? { ...panel, ...update } : panel),
+    panels: state.panels.map((panel) => panel.id === panelId
+      ? { ...panel, indicators: { ...panel.indicators, [indicator]: enabled } }
+      : panel),
   };
 }
 
