@@ -15,3 +15,178 @@
 .risk-planner-disclaimer { max-width: 920px; margin: 14px 0 0; color: #8491a2; font-size: 10px; line-height: 1.6; }
 @media (max-width: 900px) { .risk-planner-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } .risk-planner-results { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .risk-planner { padding: 18px 14px; } .risk-planner-fields, .risk-planner-results { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+
+.risk-journal-save,
+.trade-journal-actions button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #1c2633;
+  color: #d8e0ea;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.risk-journal-save {
+  grid-column: 1 / -1;
+  justify-self: start;
+  border-color: #71834a;
+}
+.risk-journal-save:focus-visible,
+.trade-journal-actions button:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.trade-journal {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #2a3544;
+}
+.trade-journal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.trade-journal-heading h4 {
+  margin: 0 0 4px;
+  color: #e8edf5;
+  font-size: 13px;
+}
+.trade-journal-heading p,
+.trade-journal-heading > span,
+.trade-journal-storage,
+.trade-journal-empty {
+  margin: 0;
+  color: #8491a2;
+  font-size: 10px;
+}
+.trade-journal-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.trade-journal-summary > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #344253;
+  border-radius: 7px;
+  background: #1a2330;
+}
+.trade-journal-summary span {
+  color: #8491a2;
+  font-size: 9px;
+}
+.trade-journal-summary strong {
+  color: #e8edf5;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.trade-journal-storage {
+  margin-top: 9px;
+}
+.trade-journal-empty {
+  padding: 14px 0;
+}
+.trade-journal-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+.trade-journal-entry {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #344253;
+  border-radius: 8px;
+  background: #1a2330;
+}
+.trade-journal-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #e8edf5;
+  font-size: 11px;
+}
+.trade-journal-status {
+  padding: 3px 7px;
+  border: 1px solid #344253;
+  border-radius: 999px;
+  color: #a9b4c3;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.trade-journal-status.is-open { border-color: #71834a; color: #d9f36a; }
+.trade-journal-status.is-closed { border-color: #346d63; color: #7fd3c0; }
+.trade-journal-status.is-cancelled { color: #8491a2; }
+.trade-journal-entry-data {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: #a9b4c3;
+  font-size: 10px;
+}
+.trade-journal-notes {
+  display: grid;
+  gap: 5px;
+  color: #8491a2;
+  font-size: 10px;
+}
+.trade-journal-notes textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 7px 8px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #151c26;
+  color: #e8edf5;
+  font: inherit;
+  font-size: 11px;
+}
+.trade-journal-notes textarea:focus-visible,
+.trade-journal-actions input:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.trade-journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+.trade-journal-actions label {
+  display: grid;
+  gap: 4px;
+  color: #8491a2;
+  font-size: 9px;
+}
+.trade-journal-actions input {
+  width: 130px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #151c26;
+  color: #e8edf5;
+  font: inherit;
+  font-size: 11px;
+}
+@media (max-width: 640px) {
+  .trade-journal-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .trade-journal-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

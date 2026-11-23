@@ -208,7 +208,13 @@ export function App() {
               : "Storage is unavailable or saved data is unsupported; existing data was not overwritten."}
           </span>
         </div>
-        <RiskPlanner />
+        {activePanel ? (
+          <RiskPlanner
+            market={activePanel.market}
+            symbol={activePanel.symbol}
+            timeframe={activePanel.timeframe}
+          />
+        ) : null}
       </section>
 
       <footer className="footer">
