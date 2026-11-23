@@ -122,6 +122,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
 
   subscribe(request: LiveMarketRequest, listener: LiveMarketListener): () => void {
     if (request.market !== "crypto") throw new Error("Binance only supports crypto subscriptions");
+    if (!/^[A-Z0-9]{5,20}$/.test(request.symbol)) throw new Error("Invalid Binance Spot symbol");
     const stream = request.symbol.toLowerCase() + "@kline_" + intervalByTimeframe[request.timeframe];
     let listeners = this.streams.get(stream);
     if (!listeners) {
@@ -213,7 +214,15 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
   }
 
   private flushControlQueue(): void {
-    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    if (this.socket?.readyState !== WebSocket.OPEN) {
+      if (this.streams.size === 0 && this.controlTimer) {
+        clearInterval(this.controlTimer);
+        this.controlTimer = undefined;
+        this.pendingSubscriptions.clear();
+        this.pendingUnsubscriptions.clear();
+      }
+      return;
+    }
     const method = this.pendingSubscriptions.size
       ? "SUBSCRIBE"
       : this.pendingUnsubscriptions.size
