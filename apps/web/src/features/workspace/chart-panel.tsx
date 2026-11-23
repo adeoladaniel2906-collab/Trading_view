@@ -1,5 +1,6 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
 import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
+import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
 import {
   SUPPORTED_SYMBOLS,
   SUPPORTED_TIMEFRAMES,
@@ -26,6 +27,7 @@ interface ChartPanelProps {
   readonly onActivate: () => void;
   readonly onSelectionChange: (selection: PanelSelection) => void;
   readonly onIndicatorChange: (indicator: IndicatorId, enabled: boolean) => void;
+  readonly onChartTypeChange: (chartType: ChartType) => void;
   readonly compact: boolean;
 }
 
@@ -39,6 +41,7 @@ export function ChartPanel({
   onActivate,
   onSelectionChange,
   onIndicatorChange,
+  onChartTypeChange,
   compact,
 }: ChartPanelProps) {
   const { candles, liveCandle, status, message } = useMarketData(
@@ -118,6 +121,15 @@ export function ChartPanel({
             ))}
           </select>
         </label>
+        <label>
+          <span>Chart type</span>
+          <select aria-label={`Chart type for ${panel.id}`} value={panel.chartType}
+            onChange={(event) => onChartTypeChange(event.currentTarget.value as ChartType)}>
+            {CHART_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
         <details className="chart-panel-indicator-menu">
           <summary>Indicators</summary>
           <fieldset className="chart-panel-indicators">
@@ -144,6 +156,7 @@ export function ChartPanel({
         symbol={panel.symbol}
         chartLabel={displaySymbol(panel.market, panel.symbol)}
         indicators={panel.indicators}
+        chartType={panel.chartType}
         compact={compact}
         emptyMessage={
           message ||
