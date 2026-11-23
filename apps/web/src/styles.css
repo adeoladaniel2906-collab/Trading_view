@@ -427,3 +427,61 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
     overflow-y: auto;
   }
 }
+
+
+.chart-panel-indicator-templates {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #344253;
+}
+.chart-panel-indicator-templates > label {
+  display: grid;
+  gap: 4px;
+  color: #a9b4c3;
+  font-size: 10px;
+}
+.chart-panel-indicator-templates input,
+.chart-panel-indicator-templates select {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid #344253;
+  border-radius: 5px;
+  background: #1c2633;
+  color: #e8edf5;
+  font: inherit;
+  font-size: 10px;
+}
+.chart-panel-indicator-templates button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #344253;
+  border-radius: 5px;
+  background: #1c2633;
+  color: #d8e0ea;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.chart-panel-indicator-templates button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.chart-panel-indicator-templates button:focus-visible,
+.chart-panel-indicator-templates input:focus-visible,
+.chart-panel-indicator-templates select:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.chart-panel-indicator-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.chart-panel-indicator-templates p {
+  margin: 0;
+  color: #8491a2;
+  font-size: 9px;
+}
