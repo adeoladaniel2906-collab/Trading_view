@@ -175,9 +175,10 @@ export function useMarketData(
         parsed.data.symbol !== symbol ||
         parsed.data.timeframe !== timeframe
       ) return;
+      const candle = parsed.data.candle;
       setState((current) => ({
         ...current,
-        liveCandle: parsed.data.candle,
+        liveCandle: candle,
         status: "live",
         message: "",
       }));
