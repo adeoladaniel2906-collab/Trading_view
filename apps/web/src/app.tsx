@@ -231,7 +231,12 @@ export function App() {
                 aria-label="Search supported symbols"
                 type="search"
                 value={symbolSearch}
-                onChange={(event) => setSymbolSearch(event.currentTarget.value)}
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+                  setSymbolSearch(next);
+                  const exactMatch = SYMBOLS[market].find((item) => item.toLowerCase() === next.trim().toLowerCase());
+                  if (exactMatch) setSymbol(exactMatch);
+                }}
                 placeholder="Search symbols"
                 list="supported-market-symbols"
               />
