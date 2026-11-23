@@ -310,7 +310,7 @@ export function MarketChart({
           {drawingMode === "horizontal"
             ? "Click the chart to place a horizontal level."
             : drawingMode === "trendline"
-              ? pendingTrendPointRef.current
+              ? trendPointPending
                 ? "Click a second point to finish the trend line."
                 : "Click two points on the chart to draw a trend line."
               : "Drawings are local to this chart session."}
