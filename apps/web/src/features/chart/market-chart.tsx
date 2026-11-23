@@ -9,18 +9,22 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { Candle } from "@market/contracts";
+import type { Candle, Timeframe } from "@market/contracts";
 import "./market-chart.css";
 
 interface MarketChartProps {
   readonly candles: readonly Candle[];
+  readonly liveCandle: Candle | null;
+  readonly timeframe: Timeframe;
+  readonly chartLabel: string;
   readonly emptyMessage: string;
 }
 
-export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
+export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyMessage }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const latestLiveCandleRef = useRef<Candle | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -42,7 +46,7 @@ export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
       timeScale: {
         borderColor: "#344253",
         timeVisible: true,
-        secondsVisible: false,
+        secondsVisible: timeframe === "1s",
       },
       localization: { locale: "en-US" },
     });
@@ -64,7 +68,7 @@ export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
       chartRef.current = null;
       chart.remove();
     };
-  }, []);
+  }, [timeframe]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -79,16 +83,38 @@ export function MarketChart({ candles, emptyMessage }: MarketChartProps) {
         close: candle.close,
       })),
     );
+    const latestLiveCandle = latestLiveCandleRef.current;
+    if (latestLiveCandle) {
+      series.update({
+        time: latestLiveCandle.time as UTCTimestamp as Time,
+        open: latestLiveCandle.open,
+        high: latestLiveCandle.high,
+        low: latestLiveCandle.low,
+        close: latestLiveCandle.close,
+      });
+    }
 
     if (candles.length > 0) {
       chartRef.current?.timeScale().fitContent();
     }
   }, [candles]);
 
+  useEffect(() => {
+    latestLiveCandleRef.current = liveCandle;
+    if (!liveCandle) return;
+    seriesRef.current?.update({
+      time: liveCandle.time as UTCTimestamp as Time,
+      open: liveCandle.open,
+      high: liveCandle.high,
+      low: liveCandle.low,
+      close: liveCandle.close,
+    });
+  }, [liveCandle]);
+
   return (
     <div className="market-chart-shell">
-      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label="Market candlestick chart" />
-      {candles.length === 0 ? (
+      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={chartLabel + " live candlestick chart"} />
+      {candles.length === 0 && !liveCandle ? (
         <div className="market-chart-empty" role="status">
           <span className="market-chart-empty-title">Chart engine ready</span>
           <span>{emptyMessage}</span>
