@@ -7,6 +7,7 @@ import {
   type LiveMarketRequest,
   type Timeframe,
 } from "@market/contracts";
+import type { ServerResponse } from "node:http";
 import type { FastifyInstance } from "fastify";
 import type { MarketDataProvider } from "../market-data/provider.js";
 import type { LiveMarketDataHub } from "../market-data/live/hub.js";
@@ -28,7 +29,7 @@ function candleInterval(timeframe: Timeframe, candleTime: number): number | unde
   return Math.floor(next / 1000) - candleTime;
 }
 
-function emit(response: typeof import("node:http").ServerResponse.prototype, name: string, data: unknown): boolean {
+function emit(response: ServerResponse, name: string, data: unknown): boolean {
   if (response.destroyed) return false;
   return response.write("event: " + name + "\ndata: " + JSON.stringify(data) + "\n\n");
 }
@@ -184,7 +185,7 @@ export async function registerLiveMarketDataRoutes(
       lastEventAt = event.timestamp;
       lastReceivedAt = event.receivedAt;
       emit(response, "market-data", event);
-      sendHealth("live");
+      if (!recoveryInFlight) sendHealth("live");
     };
 
     try {
