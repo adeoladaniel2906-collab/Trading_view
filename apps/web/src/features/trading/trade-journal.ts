@@ -6,6 +6,7 @@ import type { RiskPlan, RiskPlanInput, TradeSide } from "./risk-planner";
 export const TRADE_JOURNAL_STORAGE_KEY = "market-workspace.trade-journal.v1";
 export const TRADE_JOURNAL_SCHEMA_VERSION = 1 as const;
 export const MAX_TRADE_JOURNAL_ENTRIES = 500;
+export const MAX_TRADE_JOURNAL_CHARS = 2_000_000;
 export const MAX_TRADE_NOTES_LENGTH = 2_000;
 
 export type TradeJournalStatus = "planned" | "open" | "closed" | "cancelled";
@@ -228,7 +229,7 @@ export function summarizeTradeJournal(
 }
 
 export function parseTradeJournal(serialized: string | null): TradeJournalEntry[] | null {
-  if (!serialized || serialized.length > 1_000_000) return null;
+  if (!serialized || serialized.length > MAX_TRADE_JOURNAL_CHARS) return null;
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed) || parsed.schemaVersion !== TRADE_JOURNAL_SCHEMA_VERSION ||
@@ -262,7 +263,7 @@ export function writeTradeJournal(
     schemaVersion: TRADE_JOURNAL_SCHEMA_VERSION,
     entries,
   });
-  if (serialized.length > 1_000_000 || !parseTradeJournal(serialized)) return false;
+  if (serialized.length > MAX_TRADE_JOURNAL_CHARS || !parseTradeJournal(serialized)) return false;
   try {
     const existing = storage.getItem(TRADE_JOURNAL_STORAGE_KEY);
     if (existing !== null && !parseTradeJournal(existing)) return false;
