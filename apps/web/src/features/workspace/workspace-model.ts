@@ -53,7 +53,11 @@ function defaultPanel(id: string): ChartPanelState {
     symbol: "BTCUSDT",
     timeframe: "1m",
     chartType: "candles",
-    indicators: { sma: false, ema: false, rsi: false, macd: false, bollinger: false, atr: false, vwap: false },
+    indicators: {
+      sma: false, ema: false, wma: false, vwma: false, rsi: false,
+      macd: false, bollinger: false, atr: false, stochastic: false,
+      obv: false, vwap: false,
+    },
   };
 }
 
