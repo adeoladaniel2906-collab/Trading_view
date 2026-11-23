@@ -5,9 +5,11 @@ import {
 } from "lightweight-charts";
 import type { Candle, LiveMarketName, Timeframe } from "@market/contracts";
 import {
-  DRAWING_COLORS, applyDrawingCommand, createDrawingHistory, redoDrawing, undoDrawing,
+  DRAWING_COLORS, applyDrawingCommand, redoDrawing, undoDrawing,
   snapDrawingAnchor, type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind, type DrawingSnapMode,
 } from "./drawings";
+import { loadDrawingHistory, saveDrawingHistory } from "./drawing-storage";
+import { getBrowserStorage } from "../workspace/workspace-storage";
 import {
   averageTrueRange, bollingerBands, exponentialMovingAverage, movingAverageConvergenceDivergence,
   relativeStrengthIndex, simpleMovingAverage, volumeWeightedAveragePrice,
@@ -75,7 +77,14 @@ export function MarketChart({
   const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const cancelLabelEditRef = useRef(false);
-  const [history, setHistory] = useState<DrawingHistoryState>(() => createDrawingHistory());
+  const activeKey = contextKey(market, symbol, timeframe);
+  const drawingContext = useMemo(() => ({ market, symbol, timeframe }), [market, symbol, timeframe]);
+  const [history, setHistory] = useState<DrawingHistoryState>(() =>
+    loadDrawingHistory(drawingContext, getBrowserStorage()));
+  const [historyContextKey, setHistoryContextKey] = useState(activeKey);
+  const [dirtyContextKey, setDirtyContextKey] = useState<string | null>(null);
+  const [drawingStorageStatus, setDrawingStorageStatus] = useState<"saved" | "unavailable">(() =>
+    getBrowserStorage() ? "saved" : "unavailable");
   const [mode, setMode] = useState<DrawingMode>("none");
   const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -88,7 +97,6 @@ export function MarketChart({
   const [labelDraft, setLabelDraft] = useState("");
   const [viewportRevision, setViewportRevision] = useState(0);
   const [size, setSize] = useState({ width: 0, height: compact ? 320 : 420 });
-  const activeKey = contextKey(market, symbol, timeframe);
   const availableCandles = useMemo(() => {
     const byTime = new Map(candles.map((candle) => [candle.time, candle]));
     if (liveCandle) byTime.set(liveCandle.time, liveCandle);
@@ -96,18 +104,28 @@ export function MarketChart({
   }, [candles, liveCandle]);
 
   useEffect(() => {
-    const current = historiesRef.current.get(activeKey) ?? createDrawingHistory();
+    const current = historiesRef.current.get(activeKey) ??
+      loadDrawingHistory(drawingContext, getBrowserStorage());
     historiesRef.current.set(activeKey, current);
     setHistory(current);
+    setHistoryContextKey(activeKey);
     setSelectedId(null);
     setPendingAnchor(null);
     setMode("none");
     setDragState(null);
     setDragPreview(null);
     setEditingId(null);
-  }, [activeKey]);
+  }, [activeKey, drawingContext]);
+
+  useEffect(() => {
+    if (historyContextKey !== activeKey ||
+      (history.drawings.length === 0 && dirtyContextKey !== activeKey)) return;
+    const saved = saveDrawingHistory(drawingContext, history.drawings, getBrowserStorage());
+    setDrawingStorageStatus(saved ? "saved" : "unavailable");
+  }, [activeKey, dirtyContextKey, history, historyContextKey, drawingContext]);
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
+    setDirtyContextKey(activeKey);
     setHistory((current) => {
       const next = applyDrawingCommand(current, command);
       historiesRef.current.set(activeKey, next);
@@ -116,6 +134,7 @@ export function MarketChart({
   }, [activeKey]);
 
   const commitHistory = useCallback((transform: (current: DrawingHistoryState) => DrawingHistoryState) => {
+    setDirtyContextKey(activeKey);
     setHistory((current) => {
       const next = transform(current);
       historiesRef.current.set(activeKey, next);
@@ -534,7 +553,10 @@ export function MarketChart({
         <label className="drawing-option"><input type="checkbox" checked={keepDrawing}
           onChange={(event) => setKeepDrawing(event.currentTarget.checked)} /> Keep drawing</label>
         <span className="drawing-hint" aria-live="polite">
-          {mode === "none" ? "Drawings are scoped to this symbol and timeframe in this session."
+          {mode === "none"
+            ? drawingStorageStatus === "saved"
+              ? "Drawings are saved in this browser for this symbol and timeframe."
+              : "Browser storage unavailable; drawings will not survive a reload."
             : mode === "horizontal" || mode === "vertical" ? "Click once to place the line."
               : pendingAnchor ? "Click a second point to finish the drawing." : "Click the first point on the chart."}
         </span>

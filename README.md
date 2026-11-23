@@ -56,7 +56,11 @@ Supported shared timeframes: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 
 2. Copy .env.example to .env for local API settings.
 3. Run pnpm install.
 4. Run pnpm dev.
-5. Open the Vite URL shown in the terminal. The API health endpoint is http://127.0.0.1:3000/health.
+5. Open the Vite URL shown in the terminal (normally http://127.0.0.1:5173). The API root is http://127.0.0.1:3000/ and its health endpoint is http://127.0.0.1:3000/health.
+
+The API root returns service information; it is not the chart website. The frontend calls the API at http://127.0.0.1:3000 by default. Development CORS allows both http://127.0.0.1:5173 and http://localhost:5173. If you change either port or host, update WEB_ORIGINS in the API environment and VITE_API_ORIGIN in the frontend environment as appropriate.
+
+Workspace layout, panel settings, watchlists and chart drawings are saved in the current browser profile. This is local persistence only; it does not sync across devices or accounts.
 
 For deployment, set provider credentials only in the API runtime's secret manager. Do not put them in frontend hosting environment variables. The API binds to loopback by default. Set HOST=0.0.0.0 only when the deployment environment requires an externally reachable container port. Set WEB_ORIGINS to exact HTTPS origins in production.
 
