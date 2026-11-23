@@ -6,7 +6,13 @@ import Fastify from "fastify";
 import type { AppConfig } from "./config/env.js";
 import type { MarketDataProvider } from "./market-data/provider.js";
 import type { LiveMarketName } from "@market/contracts";
-import type { LiveMarketDataHub } from "./market-data/live/hub.js";
+import { LiveMarketDataHub } from "./market-data/live/hub.js";
+import type { LiveMarketDataProvider } from "./market-data/live/provider.js";
+import { loadConfig } from "./config/env.js";
+import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
+import { BinanceMarketDataProvider } from "./market-data/binance-provider.js";
+import { BinanceLiveProvider } from "./market-data/live/binance-provider.js";
+import { TwelveDataLiveProvider } from "./market-data/live/twelve-data-provider.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerMarketDataRoutes } from "./routes/market-data.js";
 import { registerLiveMarketDataRoutes } from "./routes/live-market-data.js";
@@ -98,3 +104,25 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   }
   return app;
 }
+
+const defaultConfig = loadConfig();
+const defaultMarketDataProvider =
+  defaultConfig.TWELVE_DATA_API_KEY && defaultConfig.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
+    ? new TwelveDataProvider(defaultConfig.TWELVE_DATA_API_KEY)
+    : undefined;
+const defaultLiveProviders: LiveMarketDataProvider[] = [new BinanceLiveProvider()];
+const defaultMarketDataProviders = {
+  crypto: new BinanceMarketDataProvider(),
+  ...(defaultMarketDataProvider ? { forex: defaultMarketDataProvider } : {}),
+};
+if (defaultConfig.TWELVE_DATA_API_KEY && defaultConfig.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED) {
+  defaultLiveProviders.push(new TwelveDataLiveProvider(defaultConfig.TWELVE_DATA_API_KEY));
+}
+const defaultLiveMarketDataHub = new LiveMarketDataHub(defaultLiveProviders);
+const defaultApp = await buildApp(defaultConfig, {
+  ...(defaultMarketDataProvider ? { marketDataProvider: defaultMarketDataProvider } : {}),
+  marketDataProviders: defaultMarketDataProviders,
+  liveMarketDataHub: defaultLiveMarketDataHub,
+});
+
+export default defaultApp;
