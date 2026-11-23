@@ -715,6 +715,16 @@ export function MarketChart({
                 onPointerDown={(event) => beginDrag(event, drawing, index)} />;
             }))}
         </svg>
+        <span className="drawing-hint" aria-live="polite">
+          {mode === "none"
+            ? drawingStorageStatus === "saved"
+              ? "Drawings saved locally for this symbol and timeframe."
+              : "Browser storage unavailable; drawings will not survive a reload."
+            : mode === "horizontal" || mode === "vertical"
+              ? "Click the chart once to place the line."
+              : pendingAnchor ? "Click a second point to finish the drawing."
+                : "Click the chart to set the first point."}
+        </span>
       </div>
       {history.drawings.length ? <section className="drawing-object-tree" aria-label="Drawing objects">
         <div className="drawing-object-tree-heading">
