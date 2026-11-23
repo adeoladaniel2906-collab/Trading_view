@@ -8,7 +8,7 @@ import {
 } from "./workspace-model";
 
 export const WORKSPACE_STORAGE_KEY = "market-workspace.snapshot.v1";
-export const WORKSPACE_STORAGE_VERSION = 1 as const;
+export const WORKSPACE_STORAGE_VERSION = 2 as const;
 export const MAX_WORKSPACE_STORAGE_CHARS = 256_000;
 export const MAX_WATCHLIST_SYMBOLS = 100;
 
@@ -25,6 +25,7 @@ export interface KeyValueStorage {
 
 const CHART_TYPES = new Set<string>(CHART_TYPE_OPTIONS.map((option) => option.value));
 const INDICATOR_IDS = INDICATOR_CATALOG.map((item) => item.id);
+const LEGACY_INDICATOR_IDS: readonly IndicatorId[] = ["sma", "ema", "rsi", "macd", "bollinger", "atr", "vwap"];
 const LAYOUTS = new Set<number>([1, 2, 4]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,7 +52,7 @@ function parseWatchlist(value: unknown, market: LiveMarketName): string[] {
   return symbols;
 }
 
-function parseWorkspace(value: unknown): WorkspaceState {
+function parseWorkspace(value: unknown, storedVersion: 1 | 2): WorkspaceState {
   if (!isRecord(value) || !LAYOUTS.has(value.layout as number)) {
     throw new TypeError("Saved workspace layout is invalid");
   }
@@ -85,13 +86,14 @@ function parseWorkspace(value: unknown): WorkspaceState {
       throw new TypeError("Saved chart type is unsupported");
     }
     const rawIndicators = rawPanel.indicators;
+    const expectedIndicatorIds = storedVersion === 1 ? LEGACY_INDICATOR_IDS : INDICATOR_IDS;
     if (!isRecord(rawIndicators) ||
-      INDICATOR_IDS.some((id) => typeof rawIndicators[id] !== "boolean") ||
-      Object.keys(rawIndicators).some((id) => !INDICATOR_IDS.includes(id as IndicatorId))) {
+      expectedIndicatorIds.some((id) => typeof rawIndicators[id] !== "boolean") ||
+      Object.keys(rawIndicators).some((id) => !expectedIndicatorIds.includes(id as IndicatorId))) {
       throw new TypeError("Saved indicator settings are invalid");
     }
     const indicators = Object.fromEntries(
-      INDICATOR_IDS.map((id) => [id, rawIndicators[id]]),
+      INDICATOR_IDS.map((id) => [id, typeof rawIndicators[id] === "boolean" ? rawIndicators[id] : false]),
     ) as Record<IndicatorId, boolean>;
     return {
       id: rawPanel.id,
@@ -132,9 +134,11 @@ export function parsePersistedWorkspace(serialized: string | null): PersistedWor
   if (!serialized || serialized.length > MAX_WORKSPACE_STORAGE_CHARS) return null;
   try {
     const parsed: unknown = JSON.parse(serialized);
-    if (!isRecord(parsed) || parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION ||
+    if (!isRecord(parsed) ||
+      (parsed.schemaVersion !== 1 && parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION) ||
       !isRecord(parsed.watchlists)) return null;
-    const workspace = parseWorkspace(parsed.workspace);
+    const storedVersion = parsed.schemaVersion as 1 | 2;
+    const workspace = parseWorkspace(parsed.workspace, storedVersion);
     const watchlists = {
       crypto: parseWatchlist(parsed.watchlists.crypto, "crypto"),
       forex: parseWatchlist(parsed.watchlists.forex, "forex"),
