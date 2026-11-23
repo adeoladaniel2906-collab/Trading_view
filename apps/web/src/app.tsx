@@ -10,7 +10,7 @@ import {
   type Timeframe,
 } from "@market/contracts";
 import { MarketChart } from "./features/chart/market-chart";
-import { RiskPlanner } from "./features/trading/risk-planner";
+import { RiskPlanner } from "./features/trading/risk-planner-panel";
 
 const EMPTY_CANDLES: readonly Candle[] = [];
 const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
