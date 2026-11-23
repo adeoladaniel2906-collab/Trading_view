@@ -239,7 +239,7 @@ This section records what is actually merged or under review. A roadmap item is 
 | B1 Workspace | Multi-panel layouts, independent panel feeds, chart types, and symbol/timeframe synchronization are merged. | Crosshair and drawing synchronization; browser/mobile regression suite. |
 | B2 Drawings | Six core drawing tools, object management, edit/rename/lock/hide/delete, snapping, undo/redo, and browser-local context-isolated persistence are merged. | Channels and advanced tools; full pointer/touch regression coverage; stronger viewport and multi-panel sync tests. |
 | B3 Indicators | Seven core indicators are merged. An expansion to WMA, VWMA, Stochastic and OBV, plus a known local-storage migration, is under review. | Saved indicator templates, complete reference fixtures and browser pane regression. Per-panel parameter controls and v3 snapshot migration are under review. |
-| B4 Trading assistance | Non-executing risk and reward planner is merged. | Instrument-aware pip/tick/contract value and fee assumptions; paper ledger; journal; checklist; daily risk dashboard. |
+| B4 Trading assistance | Non-executing risk and reward planner is merged. | Instrument-aware pip/tick/contract value and fee assumptions; saved named indicator templates; strategy checklist; broader daily risk dashboard. A local manual paper journal and basic risk summary are under review. |
 | B5 Monitoring/research | Deterministic historical bar replay is merged. | Authenticated persistent server-side alerts, screener foundations, multi-timeframe context and replay-to-journal. |
 | Phase C | Not started. | Secure script language/runtime and deterministic backtesting are later phases. |
 
