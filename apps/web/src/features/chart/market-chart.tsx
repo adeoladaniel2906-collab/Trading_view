@@ -297,6 +297,7 @@ export function MarketChart({
       <div className="market-chart-stage">
         <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={`${chartLabel} live candlestick chart`} />
         <svg className="drawing-overlay" width={size.width} height={size.height}
+          role="img" aria-label={`Drawings on ${chartLabel}`}
           viewBox={`0 0 ${Math.max(1, size.width)} ${Math.max(1, size.height)}`}>
           {history.drawings.map(renderShape)}
         </svg>
