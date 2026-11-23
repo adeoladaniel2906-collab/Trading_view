@@ -62,6 +62,6 @@ Commit the generated `pnpm-lock.yaml` after the first install. CI currently reso
 - Request bodies are size-limited; request identifiers are generated server-side.
 - Sensitive request/response fields are redacted from logs.
 - Validation errors return a generic client response; internal errors are not exposed.
-- CI runs dependency auditing and automated code checks.
+- CI runs dependency auditing, automated code checks, and GitHub CodeQL analysis.
 
 This is a foundation, not a completed production security review. Before public launch, add authentication and authorization, database access controls, persistent distributed rate limiting, observability, backups, deployment-specific CSP, secret management, and an independent security review.
