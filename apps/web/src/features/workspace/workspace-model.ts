@@ -1,5 +1,5 @@
 import type { LiveMarketName, Timeframe } from "@market/contracts";
-import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
+import { INDICATOR_CATALOG, type IndicatorId, type PriceSource } from "../chart/indicators";
 import type { ChartType } from "../chart/chart-types";
 
 export type WorkspaceLayout = 1 | 2 | 4;
@@ -18,9 +18,23 @@ export interface IndicatorParameters {
   readonly atrPeriod: number;
   readonly stochasticPeriod: number;
   readonly stochasticSignalPeriod: number;
+  readonly smaSource: PriceSource;
+  readonly emaSource: PriceSource;
+  readonly wmaSource: PriceSource;
+  readonly vwmaSource: PriceSource;
+  readonly rsiSource: PriceSource;
+  readonly macdSource: PriceSource;
+  readonly bollingerSource: PriceSource;
+  readonly stochasticSource: PriceSource;
+  readonly vwapSource: PriceSource;
 }
 
 export type IndicatorParameterKey = keyof IndicatorParameters;
+export type IndicatorSourceKey =
+  | "smaSource" | "emaSource" | "wmaSource" | "vwmaSource"
+  | "rsiSource" | "macdSource" | "bollingerSource"
+  | "stochasticSource" | "vwapSource";
+export type IndicatorParameterValue = number | PriceSource;
 
 export const DEFAULT_INDICATOR_PARAMETERS: IndicatorParameters = {
   smaPeriod: 20,
@@ -36,6 +50,15 @@ export const DEFAULT_INDICATOR_PARAMETERS: IndicatorParameters = {
   atrPeriod: 14,
   stochasticPeriod: 14,
   stochasticSignalPeriod: 3,
+  smaSource: "close",
+  emaSource: "close",
+  wmaSource: "close",
+  vwmaSource: "close",
+  rsiSource: "close",
+  macdSource: "close",
+  bollingerSource: "close",
+  stochasticSource: "close",
+  vwapSource: "hlc3",
 };
 
 const INDICATOR_PARAMETER_KEYS: readonly IndicatorParameterKey[] = [
@@ -43,6 +66,8 @@ const INDICATOR_PARAMETER_KEYS: readonly IndicatorParameterKey[] = [
   "macdFastPeriod", "macdSlowPeriod", "macdSignalPeriod",
   "bollingerPeriod", "bollingerMultiplier", "atrPeriod",
   "stochasticPeriod", "stochasticSignalPeriod",
+  "smaSource", "emaSource", "wmaSource", "vwmaSource",
+  "rsiSource", "macdSource", "bollingerSource", "stochasticSource", "vwapSource",
 ];
 
 export function isValidIndicatorParameters(value: unknown): value is IndicatorParameters {
@@ -52,7 +77,16 @@ export function isValidIndicatorParameters(value: unknown): value is IndicatorPa
     Object.keys(parameters).some((key) => !INDICATOR_PARAMETER_KEYS.includes(key as IndicatorParameterKey))) {
     return false;
   }
-  const periodKeys = INDICATOR_PARAMETER_KEYS.filter((key) => key !== "bollingerMultiplier");
+  const sourceKeys: readonly IndicatorSourceKey[] = [
+    "smaSource", "emaSource", "wmaSource", "vwmaSource", "rsiSource",
+    "macdSource", "bollingerSource", "stochasticSource", "vwapSource",
+  ];
+  const validSources = new Set<PriceSource>([
+    "open", "high", "low", "close", "hl2", "hlc3", "ohlc4", "hlcc4",
+  ]);
+  if (sourceKeys.some((key) => !validSources.has(parameters[key] as PriceSource))) return false;
+  const periodKeys = INDICATOR_PARAMETER_KEYS.filter((key) =>
+    key !== "bollingerMultiplier" && !sourceKeys.includes(key as IndicatorSourceKey));
   if (periodKeys.some((key) =>
     typeof parameters[key] !== "number" ||
     !Number.isInteger(parameters[key]) ||
@@ -184,7 +218,7 @@ export function updatePanelIndicatorParameter(
   state: WorkspaceState,
   panelId: string,
   parameter: IndicatorParameterKey,
-  value: number,
+  value: IndicatorParameterValue,
 ): WorkspaceState {
   const selectedPanel = state.panels.find((panel) => panel.id === panelId);
   if (!selectedPanel) {
