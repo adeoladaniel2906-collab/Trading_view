@@ -68,7 +68,21 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
 .workspace-layout-controls {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.workspace-layout-controls legend {
+  float: left;
+  margin-right: 4px;
+  color: #8491a2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .workspace-settings {
   display: flex;
