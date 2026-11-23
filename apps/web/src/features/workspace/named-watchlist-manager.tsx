@@ -105,7 +105,7 @@ export function NamedWatchlistManager({
           ) : (
             <ol className="named-watchlist-items">
               {selectedList.items.map((item, index) => (
-                <li key={item.symbol}>
+                <li key={`${selectedList.id}:${item.symbol}`}>
                   <button type="button" className="named-watchlist-symbol"
                     onClick={() => onSelectSymbol(item.symbol)}>{item.symbol}</button>
                   <label>
