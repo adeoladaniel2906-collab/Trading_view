@@ -438,7 +438,7 @@ export function MarketChart({
     if (drawing.kind === "rectangle") return <rect key={drawing.id}
       x={Math.min(start.x, end.x)} y={Math.min(start.y, end.y)}
       width={Math.abs(end.x - start.x)} height={Math.abs(end.y - start.y)}
-      fill="transparent" {...common} />;
+      fill="transparent" {...common} pointerEvents="all" />;
     if (drawing.kind === "ray") {
       const dx = end.x - start.x;
       if (!dx) return null;
