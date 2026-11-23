@@ -4,6 +4,7 @@ import type { Candle } from "@market/contracts";
 import { buildApp } from "../src/app.js";
 import type { AppConfig } from "../src/config/env.js";
 import type { MarketDataProvider } from "../src/market-data/provider.js";
+import { TwelveDataProvider } from "../src/market-data/twelve-data-provider.js";
 
 const config: AppConfig = {
   NODE_ENV: "test",
@@ -177,4 +178,36 @@ test("asset-routed candles reject timeframes unsupported by the selected provide
   } finally {
     await app.close();
   }
+});
+
+
+test("Twelve Data historical provider maps URL-safe Forex symbols and keeps credentials in headers", async () => {
+  let requestUrl = "";
+  let authorization = "";
+  const provider = new TwelveDataProvider("test-server-secret", async (input, init) => {
+    requestUrl = String(input);
+    const headers = new Headers(init?.headers);
+    authorization = headers.get("authorization") ?? "";
+    return new Response(JSON.stringify({
+      status: "ok",
+      values: [{
+        datetime: "2026-11-23 10:00:00",
+        open: "1.0800",
+        high: "1.0810",
+        low: "1.0790",
+        close: "1.0805",
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const candles = await provider.getCandles(
+    { symbol: "EURUSD", timeframe: "1m", limit: 100 },
+    new AbortController().signal,
+  );
+  const url = new URL(requestUrl);
+  assert.equal(url.searchParams.get("symbol"), "EUR/USD");
+  assert.equal(url.searchParams.get("interval"), "1min");
+  assert.equal(authorization, "apikey test-server-secret");
+  assert.equal(requestUrl.includes("test-server-secret"), false);
+  assert.equal(candles.length, 1);
+  assert.equal(candles[0]?.close, 1.0805);
 });
