@@ -46,7 +46,7 @@ export async function registerLiveMarketDataRoutes(
           return;
         }
         if (!response.destroyed) {
-          response.write("event: market-data\\ndata: " + JSON.stringify(event) + "\\n\\n");
+          response.write("event: market-data\ndata: " + JSON.stringify(event) + "\n\n");
         }
       });
     } catch (error) {
@@ -69,9 +69,9 @@ export async function registerLiveMarketDataRoutes(
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     });
-    response.write("event: ready\\ndata: {\"status\":\"connected\"}\\n\\n");
+    response.write("event: ready\ndata: {\"status\":\"connected\"}\n\n");
     for (const event of pending) {
-      response.write("event: market-data\\ndata: " + JSON.stringify(event) + "\\n\\n");
+      response.write("event: market-data\ndata: " + JSON.stringify(event) + "\n\n");
     }
     pending.length = 0;
 
@@ -82,7 +82,7 @@ export async function registerLiveMarketDataRoutes(
       unsubscribe();
     };
     const heartbeat = setInterval(() => {
-      if (!response?.destroyed) response?.write(": keep-alive\\n\\n");
+      if (!response?.destroyed) response?.write(": keep-alive\n\n");
       else cleanup();
     }, 15_000);
     heartbeat.unref?.();
