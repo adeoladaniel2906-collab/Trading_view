@@ -112,10 +112,11 @@ export function parseLocalDateTimeToEpochSeconds(value: string, timeZone: string
       : "Local timestamp is ambiguous in the supplied timezone");
   }
   const result = candidates[0];
-  if (result === undefined || !Number.isSafeInteger(result / 1_000)) {
+  const unixSeconds = result === undefined ? Number.NaN : Math.floor(result / 1_000);
+  if (!Number.isSafeInteger(unixSeconds)) {
     throw new RangeError("Local timestamp is outside the supported Unix timestamp range");
   }
-  return result / 1_000;
+  return unixSeconds;
 }
 
 export function zonedDateParts(epochSeconds: number, timeZone: string): ZonedDateParts {
