@@ -140,7 +140,7 @@ test("provider errors and malformed candle rows are rejected", async () => {
   const malformed = new TwelveDataProvider("test-secret-key", async () =>
     mockResponse({
       status: "ok",
-      meta: { exchange_timezone: "UTC" },
+      meta: { exchange_timezone: "Australia/Sydney" },
       values: [{ datetime: "not-a-date", open: "x", high: "2", low: "1", close: "1.5" }],
     }),
   );
