@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   CandlestickSeries,
-  LineSeries,
-  LineStyle,
   ColorType,
   CrosshairMode,
+  LineSeries,
   createChart,
   type IChartApi,
   type ISeriesApi,
-  type IPriceLine,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -26,13 +24,21 @@ interface MarketChartProps {
   readonly showEma: boolean;
 }
 
-export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyMessage, showSma, showEma }: MarketChartProps) {
+export function MarketChart({
+  candles,
+  liveCandle,
+  timeframe,
+  chartLabel,
+  emptyMessage,
+  showSma,
+  showEma,
+}: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const latestLiveCandleRef = useRef<Candle | null>(null);\n  const levelLinesRef = useRef<IPriceLine[]>([]);\n  const redoLevelsRef = useRef<number[]>([]);\n  const [levelCount, setLevelCount] = useState(0);\n  const [redoCount, setRedoCount] = useState(0);
+  const latestLiveCandleRef = useRef<Candle | null>(liveCandle);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -59,7 +65,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
       localization: { locale: "en-US" },
     });
 
-    const series = chart.addSeries(CandlestickSeries, {
+    candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a",
       downColor: "#ef5350",
       borderVisible: false,
@@ -67,41 +73,40 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
       wickDownColor: "#ef5350",
       priceLineVisible: true,
     });
-
-    const smaSeries = chart.addSeries(LineSeries, {
+    smaSeriesRef.current = chart.addSeries(LineSeries, {
       color: "#d9f36a",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
     });
-    const emaSeries = chart.addSeries(LineSeries, {
+    emaSeriesRef.current = chart.addSeries(LineSeries, {
       color: "#a9b4c3",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
     });
-
     chartRef.current = chart;
-    seriesRef.current = series;
-    smaSeriesRef.current = smaSeries;
-    emaSeriesRef.current = emaSeries;
 
     return () => {
-      seriesRef.current = null;
+      candleSeriesRef.current = null;
       smaSeriesRef.current = null;
       emaSeriesRef.current = null;
       chartRef.current = null;
-      levelLinesRef.current = [];\n      redoLevelsRef.current = [];\n      setLevelCount(0);\n      setRedoCount(0);\n      chart.remove();
+      chart.remove();
     };
   }, [timeframe]);
 
   useEffect(() => {
-    const series = seriesRef.current;
-    if (!series) return;
+    latestLiveCandleRef.current = liveCandle;
+  }, [liveCandle]);
 
-    series.setData(
+  useEffect(() => {
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries) return;
+
+    candleSeries.setData(
       candles.map((candle) => ({
         time: candle.time as UTCTimestamp as Time,
         open: candle.open,
@@ -110,35 +115,50 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
         close: candle.close,
       })),
     );
-    const indicatorByTime = new Map(candles.map((candle) => [candle.time, candle]));
-    if (liveCandle) indicatorByTime.set(liveCandle.time, liveCandle);
-    const indicatorCandles = [...indicatorByTime.values()].sort((left, right) => left.time - right.time);
-    smaSeriesRef.current?.setData(showSma
-      ? simpleMovingAverage(indicatorCandles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
-      : []);
-    emaSeriesRef.current?.setData(showEma
-      ? exponentialMovingAverage(indicatorCandles, 20).map((point) => ({ time: point.time as UTCTimestamp as Time, value: point.value }))
-      : []);
-    const latestLiveCandle = latestLiveCandleRef.current;
-    if (latestLiveCandle) {
-      series.update({
-        time: latestLiveCandle.time as UTCTimestamp as Time,
-        open: latestLiveCandle.open,
-        high: latestLiveCandle.high,
-        low: latestLiveCandle.low,
-        close: latestLiveCandle.close,
+
+    const byTime = new Map(candles.map((candle) => [candle.time, candle]));
+    if (liveCandle) byTime.set(liveCandle.time, liveCandle);
+    const indicatorCandles = [...byTime.values()].sort((left, right) => left.time - right.time);
+
+    smaSeriesRef.current?.setData(
+      showSma
+        ? simpleMovingAverage(indicatorCandles, 20).map((point) => ({
+            time: point.time as UTCTimestamp as Time,
+            value: point.value,
+          }))
+        : [],
+    );
+    emaSeriesRef.current?.setData(
+      showEma
+        ? exponentialMovingAverage(indicatorCandles, 20).map((point) => ({
+            time: point.time as UTCTimestamp as Time,
+            value: point.value,
+          }))
+        : [],
+    );
+
+    const latest = latestLiveCandleRef.current;
+    if (latest) {
+      candleSeries.update({
+        time: latest.time as UTCTimestamp as Time,
+        open: latest.open,
+        high: latest.high,
+        low: latest.low,
+        close: latest.close,
       });
     }
 
-    if (candles.length > 0) {
-      chartRef.current?.timeScale().fitContent();
-    }
+    if (candles.length > 0) chartRef.current?.timeScale().fitContent();
   }, [candles, liveCandle, showSma, showEma]);
 
   useEffect(() => {
-    latestLiveCandleRef.current = liveCandle;
+    const chart = chartRef.current;
+    chart?.applyOptions({ timeScale: { secondsVisible: timeframe === "1s" } });
+  }, [timeframe]);
+
+  useEffect(() => {
     if (!liveCandle) return;
-    seriesRef.current?.update({
+    candleSeriesRef.current?.update({
       time: liveCandle.time as UTCTimestamp as Time,
       open: liveCandle.open,
       high: liveCandle.high,
@@ -149,7 +169,12 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
 
   return (
     <div className="market-chart-shell">
-      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={chartLabel + " live candlestick chart"} />
+      <div
+        ref={containerRef}
+        className="market-chart-canvas"
+        role="img"
+        aria-label={chartLabel + " live candlestick chart"}
+      />
       {candles.length === 0 && !liveCandle ? (
         <div className="market-chart-empty" role="status">
           <span className="market-chart-empty-title">Chart engine ready</span>
