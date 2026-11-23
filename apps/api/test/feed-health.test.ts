@@ -4,7 +4,7 @@ import {
   feedHealthSchema,
   marketRecoverySchema,
 } from "@market/contracts";
-import { candleInterval } from "../src/routes/live-market-data.js";
+import { candleInterval, hasContinuousCandleCoverage } from "../src/routes/live-market-data.js";
 
 test("feed health contract accepts explicit live and degraded states", () => {
   const base = {
@@ -64,4 +64,17 @@ test("candle interval calculation handles fixed and calendar-month intervals", (
   const januaryStart = Math.floor(Date.UTC(2026, 0, 1) / 1000);
   const februaryStart = Math.floor(Date.UTC(2026, 1, 1) / 1000);
   assert.equal(candleInterval("1M", januaryStart), februaryStart - januaryStart);
+});
+
+test("Binance recovery coverage rejects missing intervals", () => {
+  const candles = [
+    { time: 1_700_000_000, open: 10, high: 12, low: 9, close: 11 },
+    { time: 1_700_000_120, open: 11, high: 13, low: 10, close: 12 },
+  ];
+  assert.equal(hasContinuousCandleCoverage(candles, "1m", 1_700_000_060, 1_700_000_120), false);
+  assert.equal(hasContinuousCandleCoverage([
+    candles[0]!,
+    { time: 1_700_000_060, open: 11, high: 12, low: 10, close: 11 },
+    candles[1]!,
+  ], "1m", 1_700_000_060, 1_700_000_120), true);
 });
