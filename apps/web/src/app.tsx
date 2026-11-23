@@ -290,7 +290,7 @@ export function App() {
           </label>
         </div>
         <div className="chart-workspace-tools">
-          <div className="watchlist-strip" role="group" aria-label="Watchlist">
+          <nav className="watchlist-strip" aria-label="Watchlist">
             <span className="tools-label">Watchlist</span>
             {watchlist[market].map((item) => (
               <button
@@ -305,7 +305,7 @@ export function App() {
             {watchlist[market].length === 0 ? <span className="tools-empty">No saved symbols</span> : null}
           </div>
           <div className="indicator-controls" role="group" aria-label="Chart indicators">
-            <span className="tools-label">Indicators</span>
+            <legend className="tools-label">Indicators</legend>
             <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
             <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
           </div>
