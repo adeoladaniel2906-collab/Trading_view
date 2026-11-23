@@ -189,7 +189,8 @@ export function ChartPanel({
         </details>
       </div>
 
-      <div className="chart-replay-controls" role="group" aria-label="Historical bar replay">
+      <fieldset className="chart-replay-controls">
+        <legend className="sr-only">Historical bar replay</legend>
         {replay ? (
           <>
             <span className="chart-replay-progress" aria-live="polite">
@@ -230,7 +231,7 @@ export function ChartPanel({
         <span className="chart-replay-note">
           Replay uses a fixed historical snapshot. Indicators only receive candles up to the replay cursor.
         </span>
-      </div>
+      </fieldset>
 
       <MarketChart
         candles={chartCandles}
