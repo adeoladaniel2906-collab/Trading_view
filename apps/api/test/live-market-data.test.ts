@@ -99,7 +99,7 @@ test("live stream route validates inputs and rejects unknown market providers", 
   try {
     const invalid = await app.inject({
       method: "GET",
-      url: "/v1/markets/forex/EUR%2FUSD/stream?timeframe=2m",
+      url: "/v1/markets/equities/ABC/stream?timeframe=2m",
     });
     assert.equal(invalid.statusCode, 400);
   } finally {
