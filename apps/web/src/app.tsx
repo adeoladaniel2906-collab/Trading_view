@@ -62,9 +62,10 @@ export function App() {
       getApiOrigin(),
     );
     const source = new EventSource(streamUrl.toString());
-    source.onopen = () => setFeedStatus("live");
-    source.onerror = () => setFeedStatus("reconnecting");
+    source.onopen = () => { if (active) setFeedStatus("live"); };
+    source.onerror = () => { if (active) setFeedStatus("reconnecting"); };
     const handleMarketData = (event: Event) => {
+      if (!active) return;
       const message = event as MessageEvent<string>;
       let payload: unknown;
       try {
@@ -147,6 +148,7 @@ export function App() {
         <MarketChart
           candles={candles}
           liveCandle={liveCandle}
+          timeframe={timeframe}
           emptyMessage={
             dataMessage ||
             (feedStatus === "reconnecting"
