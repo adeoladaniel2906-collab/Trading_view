@@ -38,7 +38,6 @@ export function MarketChart({
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const latestLiveCandleRef = useRef<Candle | null>(liveCandle);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -99,10 +98,6 @@ export function MarketChart({
   }, [timeframe]);
 
   useEffect(() => {
-    latestLiveCandleRef.current = liveCandle;
-  }, [liveCandle]);
-
-  useEffect(() => {
     const candleSeries = candleSeriesRef.current;
     if (!candleSeries) return;
 
@@ -115,7 +110,10 @@ export function MarketChart({
         close: candle.close,
       })),
     );
+    if (candles.length > 0) chartRef.current?.timeScale().fitContent();
+  }, [candles]);
 
+  useEffect(() => {
     const byTime = new Map(candles.map((candle) => [candle.time, candle]));
     if (liveCandle) byTime.set(liveCandle.time, liveCandle);
     const indicatorCandles = [...byTime.values()].sort((left, right) => left.time - right.time);
@@ -136,19 +134,6 @@ export function MarketChart({
           }))
         : [],
     );
-
-    const latest = latestLiveCandleRef.current;
-    if (latest) {
-      candleSeries.update({
-        time: latest.time as UTCTimestamp as Time,
-        open: latest.open,
-        high: latest.high,
-        low: latest.low,
-        close: latest.close,
-      });
-    }
-
-    if (candles.length > 0) chartRef.current?.timeScale().fitContent();
   }, [candles, liveCandle, showSma, showEma]);
 
   useEffect(() => {
