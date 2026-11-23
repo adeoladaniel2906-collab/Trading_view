@@ -9,7 +9,7 @@ import {
 
 export const WORKSPACE_STORAGE_KEY = "market-workspace.snapshot.v1";
 export const WORKSPACE_STORAGE_VERSION = 1 as const;
-export const MAX_WORKSPACE_STORAGE_BYTES = 256_000;
+export const MAX_WORKSPACE_STORAGE_CHARS = 256_000;
 export const MAX_WATCHLIST_SYMBOLS = 100;
 
 export interface PersistedWorkspace {
@@ -39,7 +39,7 @@ function parseWatchlist(value: unknown, market: LiveMarketName): string[] {
     if (typeof symbol !== "string" || !isSupportedSelection({
       market,
       symbol,
-      timeframe: market === "crypto" ? "1m" : "1m",
+      timeframe: "1m",
     })) {
       throw new TypeError("Saved watchlist contains an unsupported symbol");
     }
@@ -118,7 +118,7 @@ function parseWorkspace(value: unknown): WorkspaceState {
 }
 
 export function parsePersistedWorkspace(serialized: string | null): PersistedWorkspace | null {
-  if (!serialized || serialized.length > MAX_WORKSPACE_STORAGE_BYTES) return null;
+  if (!serialized || serialized.length > MAX_WORKSPACE_STORAGE_CHARS) return null;
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed) || parsed.schemaVersion !== WORKSPACE_STORAGE_VERSION ||
@@ -152,7 +152,7 @@ export function writePersistedWorkspace(
     workspace,
     watchlists,
   } satisfies PersistedWorkspace);
-  if (serialized.length > MAX_WORKSPACE_STORAGE_BYTES ||
+  if (serialized.length > MAX_WORKSPACE_STORAGE_CHARS ||
     !parsePersistedWorkspace(serialized)) return false;
   try {
     storage.setItem(WORKSPACE_STORAGE_KEY, serialized);
