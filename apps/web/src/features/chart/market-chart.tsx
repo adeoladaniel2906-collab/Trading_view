@@ -140,6 +140,7 @@ export function MarketChart({
   const keepDrawingRef = useRef(false);
   const drawingsRef = useRef<readonly ChartDrawing[]>([]);
   const commitCommandRef = useRef<(command: Parameters<typeof applyDrawingCommand>[1]) => void>(() => undefined);
+  const createRecordRef = useRef<(kind: DrawingKind, anchors: readonly DrawingAnchor[]) => ChartDrawing>(() => { throw new Error("Drawing factory is not ready"); });
 
   const contextKey = `${drawingContext.market}:${drawingContext.symbol}:${drawingContext.timeframe}`;
   const [historyByContext, setHistoryByContext] = useState<Record<string, DrawingHistoryState>>({});
@@ -183,6 +184,7 @@ export function MarketChart({
   commitCommandRef.current = commitCommand;
 
   useEffect(() => {
+    if (contextKey.length === 0) return;
     setSelectedId(null);
     setDrawingMode(null);
     setPendingAnchor(null);
@@ -195,7 +197,7 @@ export function MarketChart({
 
   useEffect(() => {
     setRenameDraft(selectedDrawing?.label ?? "");
-  }, [selectedId, contextKey, selectedDrawing?.label]);
+  }, [selectedDrawing]);
 
   const createRecord = (kind: DrawingKind, anchors: readonly DrawingAnchor[]) => {
     const count = drawingsRef.current.filter((item) => item.kind === kind).length + 1;
@@ -211,6 +213,7 @@ export function MarketChart({
       label: `${formatDrawingKind(kind)} ${count}`,
     });
   };
+  createRecordRef.current = createRecord;
 
   const projectAnchor = (anchor: DrawingAnchor): PixelPoint | null => {
     const chart = chartRef.current;
@@ -427,7 +430,7 @@ export function MarketChart({
         const firstAnchor = pendingAnchorRef.current;
         if (oneAnchorTool) {
           try {
-            const record = createRecord(tool, [anchor]);
+            const record = createRecordRef.current(tool, [anchor]);
             commitCommandRef.current({ type: "add", drawing: record });
             setSelectedId(record.id);
             if (!keepDrawingRef.current) setDrawingMode(null);
@@ -442,7 +445,7 @@ export function MarketChart({
           return;
         }
         try {
-          const record = createRecord(tool, [firstAnchor, anchor]);
+          const record = createRecordRef.current(tool, [firstAnchor, anchor]);
           commitCommandRef.current({ type: "add", drawing: record });
           setSelectedId(record.id);
           pendingAnchorRef.current = null;
@@ -614,7 +617,7 @@ export function MarketChart({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [history, contextKey, selectedId, drawings]);
+  }, [selectedId, drawings, undo, redo, cancelTool, commitCommand]);
 
   const chart = chartRef.current;
   const stage = stageRef.current;
@@ -700,7 +703,7 @@ export function MarketChart({
         ) : null}
         {selected && anchors.map((anchor, index) => (
           <circle
-            key={index}
+            key={`${drawing.id}-${anchor.time}-${anchor.price}`}
             cx={anchor.x}
             cy={anchor.y}
             r={4}
