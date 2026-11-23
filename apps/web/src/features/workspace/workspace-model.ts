@@ -41,11 +41,6 @@ export const SUPPORTED_TIMEFRAMES: Readonly<Record<LiveMarketName, readonly Time
 
 const LAYOUTS: readonly WorkspaceLayout[] = [1, 2, 4];
 
-export function isSupportedSelection(selection: PanelSelection): boolean {
-  return SUPPORTED_SYMBOLS[selection.market].includes(selection.symbol) &&
-    SUPPORTED_TIMEFRAMES[selection.market].includes(selection.timeframe);
-}
-
 function defaultPanel(id: string): ChartPanelState {
   return {
     id,
@@ -53,7 +48,11 @@ function defaultPanel(id: string): ChartPanelState {
     symbol: "BTCUSDT",
     timeframe: "1m",
     chartType: "candles",
-    indicators: { sma: false, ema: false, rsi: false, macd: false, bollinger: false, atr: false, vwap: false },
+    indicators: {
+      sma: false, ema: false, wma: false, vwma: false, rsi: false,
+      macd: false, bollinger: false, atr: false, stochastic: false,
+      obv: false, vwap: false,
+    },
   };
 }
 
