@@ -97,6 +97,19 @@ test("drawing collections require unique IDs and one exact chart context", () =>
   ), /drawing limit/);
 });
 
+test("empty drawing collections retain their chart context after deletion", () => {
+  const added = applyDrawingCommand(createDrawingHistory(), { type: "add", drawing: drawing() });
+  const deleted = applyDrawingCommand(added, { type: "delete", id: "drawing-1" });
+  assert.equal(deleted.drawings.length, 0);
+  assert.throws(() => applyDrawingCommand(deleted, {
+    type: "add",
+    drawing: validateDrawing({
+      ...drawing("horizontal", "other-context"),
+      context: { market: "crypto", symbol: "ETHUSDT", timeframe: "1m" },
+    }),
+  }), /does not match this chart context/);
+});
+
 test("add, update, delete, undo and redo operate on immutable snapshots", () => {
   const initial = createDrawingHistory();
   const added = applyDrawingCommand(initial, { type: "add", drawing: drawing() });
