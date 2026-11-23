@@ -107,6 +107,9 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
 
   private socket?: WebSocket;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private controlTimer: ReturnType<typeof setInterval> | undefined;
+  private readonly pendingSubscriptions = new Set<string>();
+  private readonly pendingUnsubscriptions = new Set<string>();
   private reconnectDelay = 1_000;
   private stopped = false;
   private requestId = 1;
@@ -131,7 +134,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
     }
     listeners.add(listener);
     if (this.socket?.readyState === WebSocket.OPEN && listeners.size === 1) {
-      this.sendSubscription("SUBSCRIBE", [stream]);
+      this.queueSubscription("SUBSCRIBE", [stream]);
     }
 
     let active = true;
@@ -143,7 +146,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
       if (current?.size === 0) {
         this.streams.delete(stream);
         if (this.socket?.readyState === WebSocket.OPEN) {
-          this.sendSubscription("UNSUBSCRIBE", [stream]);
+          this.queueSubscription("UNSUBSCRIBE", [stream]);
         }
       }
     };
@@ -162,7 +165,9 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
     socket.on("open", () => {
       this.reconnectDelay = 1_000;
       const activeStreams = [...this.streams.keys()];
-      if (activeStreams.length) this.sendSubscription("SUBSCRIBE", activeStreams);
+      this.pendingSubscriptions.clear();
+      this.pendingUnsubscriptions.clear();
+      if (activeStreams.length) this.queueSubscription("SUBSCRIBE", activeStreams);
     });
     socket.on("message", (data) => this.handleMessage(data));
     socket.on("error", () => {
@@ -188,8 +193,39 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
     }
   }
 
-  private sendSubscription(method: "SUBSCRIBE" | "UNSUBSCRIBE", params: string[]): void {
-    if (this.socket?.readyState !== WebSocket.OPEN || params.length === 0) return;
+  private queueSubscription(method: "SUBSCRIBE" | "UNSUBSCRIBE", params: string[]): void {
+    for (const stream of params) {
+      if (method === "SUBSCRIBE") {
+        this.pendingUnsubscriptions.delete(stream);
+        this.pendingSubscriptions.add(stream);
+      } else {
+        this.pendingSubscriptions.delete(stream);
+        this.pendingUnsubscriptions.add(stream);
+      }
+    }
+    if (!this.controlTimer) {
+      this.controlTimer = setInterval(() => this.flushControlQueue(), 250);
+      this.controlTimer.unref?.();
+    }
+  }
+
+  private flushControlQueue(): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    const method = this.pendingSubscriptions.size
+      ? "SUBSCRIBE"
+      : this.pendingUnsubscriptions.size
+        ? "UNSUBSCRIBE"
+        : undefined;
+    if (!method) {
+      if (this.controlTimer) clearInterval(this.controlTimer);
+      this.controlTimer = undefined;
+      return;
+    }
+    const pending = method === "SUBSCRIBE"
+      ? this.pendingSubscriptions
+      : this.pendingUnsubscriptions;
+    const params = [...pending];
+    pending.clear();
     this.socket.send(JSON.stringify({ method, params, id: this.requestId++ }));
   }
 
@@ -207,7 +243,11 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
   close(): void {
     this.stopped = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.controlTimer) clearInterval(this.controlTimer);
     this.reconnectTimer = undefined;
+    this.controlTimer = undefined;
+    this.pendingSubscriptions.clear();
+    this.pendingUnsubscriptions.clear();
     this.streams.clear();
     const socket = this.socket;
     this.socket = undefined;
