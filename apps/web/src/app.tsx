@@ -35,6 +35,25 @@ export function App() {
   const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
   const [dataMessage, setDataMessage] = useState("Loading historical market candles.");
+  const [symbolSearch, setSymbolSearch] = useState("");
+  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>({
+    crypto: ["BTCUSDT", "ETHUSDT"],
+    forex: ["EURUSD", "GBPUSD"],
+  });
+  const [showSma, setShowSma] = useState(false);
+  const [showEma, setShowEma] = useState(false);
+  const matchingSymbols = SYMBOLS[market].filter((item) =>
+    item.toLowerCase().includes(symbolSearch.trim().toLowerCase()),
+  );
+  const isWatched = watchlist[market].includes(symbol);
+  const toggleWatchlist = () => {
+    setWatchlist((current) => ({
+      ...current,
+      [market]: isWatched
+        ? current[market].filter((item) => item !== symbol)
+        : [...current[market], symbol],
+    }));
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -207,6 +226,35 @@ export function App() {
         <div className="chart-toolbar">
           <div className="chart-market-controls">
             <label className="timeframe-control">
+              <span>Find symbol</span>
+              <input
+                aria-label="Search supported symbols"
+                type="search"
+                value={symbolSearch}
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+                  setSymbolSearch(next);
+                  const exactMatch = SYMBOLS[market].find((item) => item.toLowerCase() === next.trim().toLowerCase());
+                  if (exactMatch) setSymbol(exactMatch);
+                }}
+                placeholder="Search symbols"
+                list="supported-market-symbols"
+              />
+              <datalist id="supported-market-symbols">
+                {matchingSymbols.map((item) => <option key={item} value={item} />)}
+              </datalist>
+            </label>
+            <button
+              className="workspace-control"
+              type="button"
+              onClick={toggleWatchlist}
+              aria-pressed={isWatched}
+            >
+              {isWatched ? "★ In watchlist" : "☆ Add to watchlist"}
+            </button>
+          </div>
+          <div className="chart-market-controls">
+            <label className="timeframe-control">
               <span>Market</span>
               <select
                 aria-label="Market type"
@@ -241,11 +289,34 @@ export function App() {
             </select>
           </label>
         </div>
+        <div className="chart-workspace-tools">
+          <div className="watchlist-strip" aria-label="Watchlist">
+            <span className="tools-label">Watchlist</span>
+            {watchlist[market].map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={item === symbol ? "watchlist-item is-active" : "watchlist-item"}
+                onClick={() => setSymbol(item)}
+              >
+                {item}
+              </button>
+            ))}
+            {watchlist[market].length === 0 ? <span className="tools-empty">No saved symbols</span> : null}
+          </div>
+          <div className="indicator-controls" aria-label="Chart indicators">
+            <span className="tools-label">Indicators</span>
+            <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
+            <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
+          </div>
+        </div>
         <MarketChart
           candles={candles}
           liveCandle={liveCandle}
           timeframe={timeframe}
           chartLabel={market === "crypto" ? symbol : symbol.slice(0, 3) + " " + symbol.slice(3)}
+          showSma={showSma}
+          showEma={showEma}
           emptyMessage={
             dataMessage ||
             (feedStatus === "reconnecting"
