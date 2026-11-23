@@ -170,7 +170,7 @@ test("asset-routed candles reject timeframes unsupported by the selected provide
   try {
     const response = await app.inject({
       method: "GET",
-      url: "/v1/markets/forex/EUR%2FUSD/candles?timeframe=1s",
+      url: "/v1/markets/forex/EURUSD/candles?timeframe=1s",
     });
     assert.equal(response.statusCode, 422);
     assert.equal(response.json().error.code, "TIMEFRAME_UNSUPPORTED");
