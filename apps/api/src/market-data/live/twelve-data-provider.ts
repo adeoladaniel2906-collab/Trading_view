@@ -23,8 +23,8 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
   readonly market = "forex" as const;
 
   private socket?: WebSocket;
-  private reconnectTimer?: ReturnType<typeof setTimeout>;
-  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private reconnectDelay = 1_000;
   private stopped = false;
   private readonly symbols = new Map<string, Set<LiveMarketListener>>();
