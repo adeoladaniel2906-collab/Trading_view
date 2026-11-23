@@ -143,6 +143,7 @@ export function ChartPanel({
         liveCandle={liveCandle}
         timeframe={panel.timeframe}
         chartLabel={displaySymbol(panel.market, panel.symbol)}
+        drawingContext={{ market: panel.market, symbol: panel.symbol, timeframe: panel.timeframe }}
         showSma={panel.showSma}
         showEma={panel.showEma}
         compact={compact}
