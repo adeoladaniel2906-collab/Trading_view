@@ -101,3 +101,130 @@
   flex-basis: 100%;
   margin-left: 0;
 }
+
+.market-chart-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 420px;
+  background: #151c26;
+}
+.market-chart-stage .market-chart-canvas {
+  position: relative;
+  z-index: 1;
+}
+.market-drawing-overlay {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.market-chart-stage .market-chart-empty {
+  z-index: 3;
+}
+.drawing-keep-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #b8c4d3;
+  font-size: 11px;
+}
+.drawing-keep-control input {
+  accent-color: #d9f36a;
+}
+.drawing-object-tree {
+  padding: 10px 14px;
+  border-top: 1px solid #2a3544;
+  background: #151c26;
+}
+.drawing-object-tree summary {
+  color: #b8c4d3;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.drawing-object-tree ul {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+.drawing-object-tree li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid #2a3544;
+  border-radius: 7px;
+}
+.drawing-object-tree li.is-selected {
+  border-color: #d9f36a;
+}
+.drawing-object-tree button {
+  padding: 5px 8px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #1c2633;
+  color: #b8c4d3;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.drawing-object-tree button:focus-visible,
+.drawing-object-editor input:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.drawing-object-tree button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.drawing-object-select {
+  display: grid;
+  flex: 1 1 160px;
+  gap: 3px;
+  text-align: left;
+}
+.drawing-object-select small {
+  color: #8491a2;
+  font-size: 9px;
+}
+.drawing-object-empty {
+  margin: 10px 0 0;
+  color: #8491a2;
+  font-size: 11px;
+}
+.drawing-object-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2a3544;
+}
+.drawing-object-editor label {
+  display: grid;
+  flex: 1 1 160px;
+  gap: 4px;
+  color: #8491a2;
+  font-size: 10px;
+}
+.drawing-object-editor input {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #1c2633;
+  color: #e8edf5;
+  font: inherit;
+}
+.drawing-message {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid #2a3544;
+  color: #efb4a8;
+  font-size: 11px;
+}
