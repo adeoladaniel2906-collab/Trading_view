@@ -69,7 +69,7 @@ test("renames and deletes lists without leaving invalid active IDs", () => {
 });
 
 test("watchlist order operations are safe at boundaries and timestamps cannot move backward", () => {
-  let collection = addWatchlistSymbol(createList(), "list-1", "BTCUSDT", 101);
+  const collection = addWatchlistSymbol(createList(), "list-1", "BTCUSDT", 101);
   const unchanged = moveWatchlistSymbol(collection, "list-1", "BTCUSDT", "up", 102);
   assert.equal(unchanged, collection);
   assert.throws(() => renameNamedWatchlist(collection, "list-1", "Renamed", 99), /timestamp/);
