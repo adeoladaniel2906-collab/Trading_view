@@ -236,8 +236,7 @@ export function App() {
     setWatchlist((current) => ({
       ...current,
       [market]: current[market].includes(symbol)
-        ? current[market].filter((item) => item !== symbol)
-        : [...current[market], symbol],
+        ? current[market].filter((item) => item !== symbol)        : [...current[market], symbol],
     }));
   };
 
@@ -255,143 +254,60 @@ export function App() {
     : false;
 
   return (
-    <main className="workspace">
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Market Workspace home">
+    <main className="workspace terminal-shell">
+      <header className="topbar terminal-topbar">
+        <a className="brand" href="/" aria-label="Market Workspace chart">
           <span className="brand-mark" aria-hidden="true">M</span>
-          <span>Market Workspace</span>
+          <span>MARKET WORKSPACE</span>
         </a>
-        <span className="environment-label">Live market workspace</span>
+        <div className="terminal-topbar-meta">
+          <span className="terminal-session">MARKET ANALYSIS</span>
+          <span className="terminal-status"><i aria-hidden="true" /> DATA CONNECTION</span>
+        </div>
       </header>
 
-      <section className="intro" aria-labelledby="page-title">
-        <p className="eyebrow">Independent market analysis</p>
-        <h1 id="page-title">A clearer view of the markets.</h1>
-        <p className="intro-copy">
-          Compare instruments across independent chart panels. The backend routes crypto to
-          Binance Spot and Forex to Twelve Data, keeping provider connections and credentials server-side.
-        </p>
-      </section>
-
-      <section className="workspace-panel" aria-labelledby="chart-title">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">Multi-chart analysis</h2>
+      <section className="workspace-panel terminal-panel" aria-label="Live market chart workspace">
+        <div className="terminal-marketbar">
+          <div className="terminal-market-context">
+            <span className="terminal-kicker">CHART / MARKET</span>
+            <strong>{activePanel ? activePanel.symbol : "Select a market"}</strong>
+            <span>{activePanel ? activePanel.market.toUpperCase() : "No active instrument"} · {activePanel?.timeframe ?? ""}</span>
           </div>
-          <fieldset className="workspace-layout-controls"><legend>Chart layout</legend>
+          <fieldset className="workspace-layout-controls terminal-layout-controls">
+            <legend>LAYOUT</legend>
             {LAYOUT_OPTIONS.map((layout) => (
-              <button
-                key={layout}
-                className="workspace-control"
-                type="button"
-                aria-pressed={workspace.layout === layout}
-                onClick={() => changeLayout(layout)}
-              >
-                {layout === 1 ? "1 chart" : `${layout} charts`}
+              <button key={layout} className="workspace-control" type="button"
+                aria-pressed={workspace.layout === layout} onClick={() => changeLayout(layout)}>
+                {layout === 1 ? "Single" : layout === 2 ? "2 panels" : "4 panels"}
               </button>
             ))}
           </fieldset>
         </div>
 
-        <div className="workspace-settings">
-          <span className="tools-label">Sync active panel</span>
-          <label>
-            <input
-              type="checkbox"
-              checked={workspace.sync.symbol}
-              onChange={(event) => setWorkspace((current) =>
-                updateWorkspaceSync(current, { symbol: event.currentTarget.checked }))}
-            />
-            Symbol
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={workspace.sync.timeframe}
-              onChange={(event) => setWorkspace((current) =>
-                updateWorkspaceSync(current, { timeframe: event.currentTarget.checked }))}
-            />
-            Timeframe
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={workspace.sync.crosshair}
-              onChange={(event) => setWorkspace((current) =>
-                updateWorkspaceSync(current, { crosshair: event.currentTarget.checked }))}
-            />
-            Crosshair
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={workspace.sync.drawings}
-              onChange={(event) => setWorkspace((current) =>
-                updateWorkspaceSync(current, { drawings: event.currentTarget.checked }))}
-            />
-            Drawings
-          </label>
-          <span className="sync-note">Crosshair aligns to the nearest UTC candle. Drawings sync only across panels with the exact same market, symbol and timeframe.</span>
-        </div>
+        <nav className="watchlist-strip terminal-watchlist" aria-label="Quick market watchlist">
+          <span className="tools-label">WATCHLIST</span>
+          {activePanel && watchlist[activePanel.market].map((symbol) => (
+            <button key={symbol} type="button"
+              className={symbol === activePanel.symbol ? "watchlist-item is-active" : "watchlist-item"}
+              onClick={() => selectWatchlistSymbol(symbol)}>{symbol}</button>
+          ))}
+          <button className="workspace-control terminal-add-symbol" type="button"
+            onClick={toggleWatchlist} aria-pressed={isWatched} disabled={!activePanel}>
+            {isWatched ? "− Remove" : "+ Add symbol"}
+          </button>
+          {activePanel && watchlist[activePanel.market].length === 0
+            ? <span className="tools-empty">No saved symbols</span> : null}
+        </nav>
 
-        <div className="chart-workspace-tools">
-          <nav className="watchlist-strip" aria-label="Active panel watchlist">
-            <span className="tools-label">Quick watchlist</span>
-            {activePanel && watchlist[activePanel.market].map((symbol) => (
-              <button
-                key={symbol}
-                type="button"
-                className={symbol === activePanel.symbol ? "watchlist-item is-active" : "watchlist-item"}
-                onClick={() => selectWatchlistSymbol(symbol)}
-              >
-                {symbol}
-              </button>
-            ))}
-            <button
-              className="workspace-control"
-              type="button"
-              onClick={toggleWatchlist}
-              aria-pressed={isWatched}
-              disabled={!activePanel}
-            >
-              {isWatched ? "★ Remove active symbol" : "☆ Add active symbol"}
-            </button>
-            {activePanel && watchlist[activePanel.market].length === 0
-              ? <span className="tools-empty">No saved symbols for this market</span>
-              : null}
-          </nav>
-          {activePanel ? (
-            <NamedWatchlistManager
-              market={activePanel.market}
-              activeSymbol={activePanel.symbol}
-              collection={namedWatchlists}
-              storageStatus={namedWatchlistStorageStatus}
-              actionStatus={namedWatchlistActionStatus}
-              onSelectSymbol={selectWatchlistSymbol}
-              onCreateList={createWatchlist}
-              onSelectList={selectWatchlist}
-              onRenameList={renameWatchlist}
-              onDeleteList={deleteWatchlist}
-              onAddSymbol={addSymbolToNamedWatchlist}
-              onRemoveSymbol={removeSymbolFromNamedWatchlist}
-              onMoveSymbol={moveNamedWatchlistSymbol}
-              onUpdateNote={updateNamedWatchlistNote}
-            />
-          ) : null}
-        </div>
-
-        <div className={`chart-grid chart-grid-${workspace.layout}`} data-layout={workspace.layout}>
+        <div className={`chart-grid chart-grid-${workspace.layout} terminal-chart-grid`}
+          data-layout={workspace.layout}>
           {workspace.panels.map((panel) => (
-            <ChartPanel
-              key={panel.id}
-              panel={panel}
+            <ChartPanel key={panel.id} panel={panel}
               active={panel.id === workspace.activePanelId}
               onActivate={() => setWorkspace((current) => selectActivePanel(current, panel.id))}
               onSelectionChange={(selection) => changeSelection(panel.id, selection)}
               onIndicatorChange={(indicator, enabled) => changeIndicator(panel.id, indicator, enabled)}
-              onIndicatorParameterChange={(parameter, value) =>
-                changeIndicatorParameter(panel.id, parameter, value)}
+              onIndicatorParameterChange={(parameter, value) => changeIndicatorParameter(panel.id, parameter, value)}
               indicatorTemplates={indicatorTemplates}
               templateStorageStatus={templateStorageStatus}
               templateActionStatus={panel.id === workspace.activePanelId ? templateActionStatus : null}
@@ -402,39 +318,63 @@ export function App() {
               compact={workspace.layout !== 1}
               syncCrosshair={workspace.sync.crosshair}
               syncDrawings={workspace.sync.drawings}
-              crosshairTime={
-                crosshairSyncState?.sourcePanelId !== panel.id ? crosshairSyncState?.time ?? null : null
-              }
+              crosshairTime={crosshairSyncState?.sourcePanelId !== panel.id
+                ? crosshairSyncState?.time ?? null : null}
               onCrosshairTime={handleCrosshairTime}
             />
           ))}
         </div>
 
-        <div className="workspace-active-note" aria-live="polite">
-          Active panel: {activePanel?.symbol ?? "None"} · Changes apply to the active panel unless synchronization is enabled.
-          <span className="workspace-save-status" role="status">
-            {storageStatus === "saved"
-              ? "Workspace and watchlists saved in this browser"
-              : "Storage is unavailable or saved data is unsupported; existing data was not overwritten."}
-          </span>
+        <div className="terminal-statusline" aria-live="polite">
+          <span>{activePanel ? `${activePanel.market.toUpperCase()} · ${activePanel.symbol} · ${activePanel.timeframe}` : "No active chart"}</span>
+          <span>{storageStatus === "saved" ? "WORKSPACE SAVED LOCALLY" : "LOCAL STORAGE UNAVAILABLE"}</span>
         </div>
+
+        <details className="terminal-drawer">
+          <summary>Workspace tools <span>Watchlists · Synchronization · Saved analysis</span></summary>
+          <div className="terminal-drawer-content">
+            {activePanel ? (
+              <NamedWatchlistManager market={activePanel.market} activeSymbol={activePanel.symbol}
+                collection={namedWatchlists} storageStatus={namedWatchlistStorageStatus}
+                actionStatus={namedWatchlistActionStatus} onSelectSymbol={selectWatchlistSymbol}
+                onCreateList={createWatchlist} onSelectList={selectWatchlist}
+                onRenameList={renameWatchlist} onDeleteList={deleteWatchlist}
+                onAddSymbol={addSymbolToNamedWatchlist}
+                onRemoveSymbol={removeSymbolFromNamedWatchlist}
+                onMoveSymbol={moveNamedWatchlistSymbol}
+                onUpdateNote={updateNamedWatchlistNote} />
+            ) : null}
+            <div className="workspace-settings terminal-sync-settings">
+              <span className="tools-label">SYNC PANELS</span>
+              <label><input type="checkbox" checked={workspace.sync.symbol}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { symbol: event.currentTarget.checked }))} /> Symbol</label>
+              <label><input type="checkbox" checked={workspace.sync.timeframe}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { timeframe: event.currentTarget.checked }))} /> Timeframe</label>
+              <label><input type="checkbox" checked={workspace.sync.crosshair}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { crosshair: event.currentTarget.checked }))} /> Crosshair</label>
+              <label><input type="checkbox" checked={workspace.sync.drawings}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { drawings: event.currentTarget.checked }))} /> Drawings</label>
+              <span className="sync-note">Drawings synchronize only across identical market, symbol and timeframe contexts.</span>
+            </div>
+          </div>
+        </details>
+
         {activePanel ? (
-          <RiskPlanner
-            market={activePanel.market}
-            symbol={activePanel.symbol}
-            timeframe={activePanel.timeframe}
-          />
+          <details className="terminal-risk-drawer">
+            <summary>Position sizing calculator <span>Risk planning tools</span></summary>
+            <RiskPlanner market={activePanel.market} symbol={activePanel.symbol}
+              timeframe={activePanel.timeframe} />
+          </details>
         ) : null}
       </section>
 
-      <footer className="footer">
-        <span>Independent market analysis · No trading execution</span>
-        <span>
-          Charting by{" "}
-          <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
-            TradingView Lightweight Charts™
-          </a>
-        </span>
+      <footer className="footer terminal-footer">
+        <span>Independent market analysis · No order execution</span>
+        <span>Market data status is shown on each chart. Provider credentials remain server-side.</span>
       </footer>
     </main>
   );
