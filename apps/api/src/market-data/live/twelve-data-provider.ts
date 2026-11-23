@@ -149,6 +149,7 @@ export class TwelveDataLiveProvider implements LiveMarketDataProvider {
     for (const channel of this.channels.values()) {
       if (channel.request.symbol !== symbol) continue;
       const candleTime = bucketStart(tickTime, channel.request.timeframe);
+      if (channel.candle && candleTime < channel.candle.time) continue;
       if (channel.candle && channel.candle.time !== candleTime) {
         this.publish(channel, channel.candle, tickTime * 1000, receivedAt, true);
         channel.candle = undefined;
