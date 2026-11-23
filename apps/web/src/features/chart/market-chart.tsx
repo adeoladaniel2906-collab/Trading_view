@@ -82,6 +82,7 @@ export function MarketChart({
   const [history, setHistory] = useState<DrawingHistoryState>(() =>
     loadDrawingHistory(drawingContext, getBrowserStorage()));
   const [historyContextKey, setHistoryContextKey] = useState(activeKey);
+  const [dirtyContextKey, setDirtyContextKey] = useState<string | null>(null);
   const [drawingStorageStatus, setDrawingStorageStatus] = useState<"saved" | "unavailable">("saved");
   const [mode, setMode] = useState<DrawingMode>("none");
   const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
@@ -116,12 +117,14 @@ export function MarketChart({
   }, [activeKey, market, symbol, timeframe]);
 
   useEffect(() => {
-    if (historyContextKey !== activeKey) return;
+    if (historyContextKey !== activeKey ||
+      (history.drawings.length === 0 && dirtyContextKey !== activeKey)) return;
     const saved = saveDrawingHistory(drawingContext, history.drawings, getBrowserStorage());
     setDrawingStorageStatus(saved ? "saved" : "unavailable");
-  }, [activeKey, history, historyContextKey, market, symbol, timeframe]);
+  }, [activeKey, dirtyContextKey, history, historyContextKey, market, symbol, timeframe]);
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
+    setDirtyContextKey(activeKey);
     setHistory((current) => {
       const next = applyDrawingCommand(current, command);
       historiesRef.current.set(activeKey, next);
@@ -130,6 +133,7 @@ export function MarketChart({
   }, [activeKey]);
 
   const commitHistory = useCallback((transform: (current: DrawingHistoryState) => DrawingHistoryState) => {
+    setDirtyContextKey(activeKey);
     setHistory((current) => {
       const next = transform(current);
       historiesRef.current.set(activeKey, next);
