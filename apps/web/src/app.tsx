@@ -15,8 +15,10 @@ import {
   selectActivePanel,
   updatePanelChartType,
   updatePanelIndicator,
+  updatePanelIndicatorParameter,
   updatePanelSelection,
   updateWorkspaceSync,
+  type IndicatorParameterKey,
   type PanelSelection,
   type WorkspaceLayout,
 } from "./features/workspace/workspace-model";
@@ -51,6 +53,10 @@ export function App() {
 
   const changeSelection = (panelId: string, selection: PanelSelection) => {
     setWorkspace((current) => updatePanelSelection(current, panelId, selection));
+  };
+
+  const changeIndicatorParameter = (panelId: string, parameter: IndicatorParameterKey, value: number) => {
+    setWorkspace((current) => updatePanelIndicatorParameter(current, panelId, parameter, value));
   };
 
   const changeChartType = (panelId: string, chartType: ChartType) => {
@@ -185,6 +191,8 @@ export function App() {
               onActivate={() => setWorkspace((current) => selectActivePanel(current, panel.id))}
               onSelectionChange={(selection) => changeSelection(panel.id, selection)}
               onIndicatorChange={(indicator, enabled) => changeIndicator(panel.id, indicator, enabled)}
+              onIndicatorParameterChange={(parameter, value) =>
+                changeIndicatorParameter(panel.id, parameter, value)}
               onChartTypeChange={(chartType) => changeChartType(panel.id, chartType)}
               compact={workspace.layout !== 1}
             />
