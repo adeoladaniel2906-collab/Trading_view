@@ -41,6 +41,11 @@ export const SUPPORTED_TIMEFRAMES: Readonly<Record<LiveMarketName, readonly Time
 
 const LAYOUTS: readonly WorkspaceLayout[] = [1, 2, 4];
 
+export function isSupportedSelection(selection: PanelSelection): boolean {
+  return SUPPORTED_SYMBOLS[selection.market].includes(selection.symbol) &&
+    SUPPORTED_TIMEFRAMES[selection.market].includes(selection.timeframe);
+}
+
 function defaultPanel(id: string): ChartPanelState {
   return {
     id,
