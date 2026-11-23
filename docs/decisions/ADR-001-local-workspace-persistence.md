@@ -11,13 +11,14 @@ The application must not pretend that browser-local data is cloud-synchronized o
 
 ## Decision
 
-Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, named indicator templates, drawing records, and a separate bounded manual paper-trade journal. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
+Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, named indicator templates, ordered named watchlists with notes, drawing records, and a separate bounded manual paper-trade journal. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
 
 Persist:
 - The bounded 1/2/4-panel workspace and per-panel settings.
 - Supported crypto and Forex watchlists.
 - Drawing records, partitioned by exact market, symbol, and timeframe.
 - Manual paper-journal entries with bounded notes and planned/open/closed/cancelled states, stored under a separate versioned key.
+- Named watchlists with market ownership, ordered symbols, bounded notes and per-market active-list selection.
 
 Do not persist:
 - API keys, provider credentials, session tokens, or authentication secrets.
