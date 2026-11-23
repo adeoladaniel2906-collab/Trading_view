@@ -216,7 +216,7 @@ export function App() {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : symbol.slice(0, 3) + "/" + symbol.slice(3)}</h2>
+            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : `${symbol.slice(0, 3)}/${symbol.slice(3)}`}</h2>
           </div>
           <span className="status-pill" aria-live="polite">
             <span className="status-dot" />
@@ -290,7 +290,7 @@ export function App() {
           </label>
         </div>
         <div className="chart-workspace-tools">
-          <div className="watchlist-strip" aria-label="Watchlist">
+          <div className="watchlist-strip" role="group" aria-label="Watchlist">
             <span className="tools-label">Watchlist</span>
             {watchlist[market].map((item) => (
               <button
@@ -304,7 +304,7 @@ export function App() {
             ))}
             {watchlist[market].length === 0 ? <span className="tools-empty">No saved symbols</span> : null}
           </div>
-          <div className="indicator-controls" aria-label="Chart indicators">
+          <div className="indicator-controls" role="group" aria-label="Chart indicators">
             <span className="tools-label">Indicators</span>
             <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
             <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
@@ -314,7 +314,7 @@ export function App() {
           candles={candles}
           liveCandle={liveCandle}
           timeframe={timeframe}
-          chartLabel={market === "crypto" ? symbol : symbol.slice(0, 3) + " " + symbol.slice(3)}
+          chartLabel={market === "crypto" ? symbol : `${symbol.slice(0, 3)} ${symbol.slice(3)}`}
           showSma={showSma}
           showEma={showEma}
           emptyMessage={
