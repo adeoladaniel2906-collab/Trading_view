@@ -16,18 +16,22 @@ const environmentSchema = z.object({
         }, "Origins must not contain paths, credentials, or query strings."),
       ).min(1),
     ),
+  TWELVE_DATA_API_KEY: z.string().trim().min(1).optional(),
+  TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 export type AppConfig = z.infer<typeof environmentSchema>;
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = environmentSchema.safeParse(environment);
-
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`)
+      .map((issue) => (issue.path.join(".") || "environment") + ": " + issue.message)
       .join("; ");
-    throw new Error(`Invalid application configuration: ${issues}`);
+    throw new Error("Invalid application configuration: " + issues);
   }
 
   if (
@@ -37,5 +41,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     throw new Error("Production WEB_ORIGINS must contain HTTPS origins only.");
   }
 
+  if (parsed.data.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED && !parsed.data.TWELVE_DATA_API_KEY) {
+    throw new Error("A Twelve Data API key is required when display access is enabled.");
+  }
   return parsed.data;
 }
