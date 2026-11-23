@@ -234,3 +234,24 @@ test("Twelve Data adapter keeps its API key in a server-side WebSocket header", 
   unsubscribe();
   provider.close();
 });
+
+
+test("Binance live adapter maps every supported Spot interval", () => {
+  const sockets: FakeSocket[] = [];
+  const provider = new BinanceLiveProvider((url) => {
+    const socket = new FakeSocket(url);
+    sockets.push(socket);
+    return socket as unknown as WebSocket;
+  });
+  const timeframes = ["1s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"] as const;
+  const unsubscribers = timeframes.map((timeframe) =>
+    provider.subscribe({ market: "crypto", symbol: "BTCUSDT", timeframe }, () => undefined),
+  );
+  const socket = sockets[0];
+  assert.ok(socket);
+  socket.open();
+  const subscription = JSON.parse(socket.sent[0] ?? "{}") as { params?: string[] };
+  assert.deepEqual(subscription.params, timeframes.map((timeframe) => "btcusdt@kline_" + timeframe));
+  for (const unsubscribe of unsubscribers) unsubscribe();
+  provider.close();
+});
