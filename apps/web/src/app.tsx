@@ -4,12 +4,16 @@ import {
   marketCandlesResponseSchema,
   timeframeSchema,
   type Candle,
+  type LiveMarketName,
   type Timeframe,
 } from "@market/contracts";
 import { MarketChart } from "./features/chart/market-chart";
 
 const EMPTY_CANDLES: readonly Candle[] = [];
-const MARKET_SYMBOL = "BTCUSDT";
+const SYMBOLS: Record<LiveMarketName, readonly string[]> = {
+  crypto: ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"],
+  forex: ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD"],
+};
 const TIMEFRAMES = timeframeSchema.options;
 type FeedStatus = "loading" | "connecting" | "live" | "reconnecting" | "unavailable";
 
@@ -20,11 +24,13 @@ function getApiOrigin(): string {
 }
 
 export function App() {
+  const [market, setMarket] = useState<LiveMarketName>("crypto");
+  const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState<Timeframe>("1m");
   const [candles, setCandles] = useState<readonly Candle[]>(EMPTY_CANDLES);
   const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>("loading");
-  const [dataMessage, setDataMessage] = useState("Loading historical Binance candles.");
+  const [dataMessage, setDataMessage] = useState("Loading historical market candles.");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -32,17 +38,19 @@ export function App() {
     setCandles(EMPTY_CANDLES);
     setLiveCandle(null);
     setFeedStatus("loading");
-    setDataMessage("Loading historical Binance candles.");
+    setDataMessage("Loading historical market candles.");
 
     const historyUrl = new URL(
-      `/v1/markets/crypto/${MARKET_SYMBOL}/candles?timeframe=${encodeURIComponent(timeframe)}&limit=500`,
+      `/v1/markets/${market}/${encodeURIComponent(symbol)}/candles?timeframe=${encodeURIComponent(timeframe)}&limit=500`,
       getApiOrigin(),
     );
     void fetch(historyUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Historical market data is unavailable.");
+        if (!response.ok) throw new Error(market === "forex"
+          ? "Forex history is unavailable. Check the Twelve Data API key and display-license configuration."
+          : "Historical market data is unavailable.");
         const parsed = marketCandlesResponseSchema.safeParse(await response.json());
-        if (!parsed.success || parsed.data.symbol !== MARKET_SYMBOL || parsed.data.timeframe !== timeframe) {
+        if (!parsed.success || parsed.data.symbol !== symbol || parsed.data.timeframe !== timeframe) {
           throw new Error("The historical market-data response failed validation.");
         }
         if (active) {
@@ -58,7 +66,7 @@ export function App() {
       });
 
     const streamUrl = new URL(
-      `/v1/markets/crypto/${MARKET_SYMBOL}/stream?timeframe=${encodeURIComponent(timeframe)}`,
+      `/v1/markets/${market}/${encodeURIComponent(symbol)}/stream?timeframe=${encodeURIComponent(timeframe)}`,
       getApiOrigin(),
     );
     const source = new EventSource(streamUrl.toString());
@@ -74,12 +82,13 @@ export function App() {
         return;
       }
       const parsed = liveMarketEventSchema.safeParse(payload);
+      const expectedProvider = market === "crypto" ? "binance" : "twelve-data";
       if (
         !parsed.success ||
         parsed.data.kind !== "candle" ||
-        parsed.data.market !== "crypto" ||
-        parsed.data.provider !== "binance" ||
-        parsed.data.symbol !== MARKET_SYMBOL ||
+        parsed.data.market !== market ||
+        parsed.data.provider !== expectedProvider ||
+        parsed.data.symbol !== symbol ||
         parsed.data.timeframe !== timeframe
       ) return;
       setLiveCandle(parsed.data.candle);
@@ -92,15 +101,20 @@ export function App() {
       controller.abort();
       source.close();
     };
-  }, [timeframe]);
+  }, [market, symbol, timeframe]);
 
   const statusLabel = {
     loading: "Loading market data",
-    connecting: "Connecting to Binance",
-    live: "Binance live",
-    reconnecting: "Reconnecting to Binance",
+    connecting: "Connecting",
+    live: market === "crypto" ? "Binance live" : "Twelve Data live",
+    reconnecting: "Reconnecting",
     unavailable: "Data temporarily unavailable",
   }[feedStatus];
+
+  const changeMarket = (nextMarket: LiveMarketName) => {
+    setMarket(nextMarket);
+    setSymbol(SYMBOLS[nextMarket][0] ?? "");
+  };
 
   return (
     <main className="workspace">
@@ -115,15 +129,15 @@ export function App() {
         <p className="eyebrow">Independent market analysis</p>
         <h1 id="page-title">A clearer view of the markets.</h1>
         <p className="intro-copy">
-          Historical and live BTC/USDT candles are routed through the Binance Spot provider.
-          Changing the interval reloads history and switches the matching live stream.
+          Select a market, instrument and interval. The backend routes crypto to Binance Spot
+          and Forex to Twelve Data, keeping provider connections and credentials server-side.
         </p>
       </section>
       <section className="workspace-panel" aria-labelledby="chart-title">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Chart workspace</p>
-            <h2 id="chart-title">BTC / USDT</h2>
+            <h2 id="chart-title">{market === "crypto" ? symbol.replace("USDT", " / USDT") : symbol}</h2>
           </div>
           <span className="status-pill" aria-live="polite">
             <span className="status-dot" />
@@ -131,7 +145,29 @@ export function App() {
           </span>
         </div>
         <div className="chart-toolbar">
-          <span className="chart-symbol">BINANCE: BTCUSDT · Spot</span>
+          <div className="chart-market-controls">
+            <label className="timeframe-control">
+              <span>Market</span>
+              <select
+                aria-label="Market type"
+                value={market}
+                onChange={(event) => changeMarket(event.currentTarget.value as LiveMarketName)}
+              >
+                <option value="crypto">Crypto</option>
+                <option value="forex">Forex</option>
+              </select>
+            </label>
+            <label className="timeframe-control">
+              <span>Symbol</span>
+              <select
+                aria-label="Market symbol"
+                value={symbol}
+                onChange={(event) => setSymbol(event.currentTarget.value)}
+              >
+                {SYMBOLS[market].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
           <label className="timeframe-control">
             <span>Interval</span>
             <select
@@ -149,11 +185,12 @@ export function App() {
           candles={candles}
           liveCandle={liveCandle}
           timeframe={timeframe}
+          chartLabel={market === "crypto" ? symbol : symbol.replace("/", " ")}
           emptyMessage={
             dataMessage ||
             (feedStatus === "reconnecting"
               ? "The live feed is reconnecting. Waiting for the next verified update."
-              : "Waiting for the first verified Binance candle. No prices are simulated.")
+              : "Waiting for the first verified market candle. No prices are simulated.")
           }
         />
       </section>
