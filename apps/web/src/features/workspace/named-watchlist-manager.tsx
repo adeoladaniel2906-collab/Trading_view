@@ -43,14 +43,14 @@ export function NamedWatchlistManager({
 
   useEffect(() => {
     setRenameDraft(selectedList?.name ?? "");
-  }, [selectedList?.id, selectedList?.name]);
+  }, [selectedList?.name]);
 
   return (
     <section className="named-watchlist-manager" aria-label={`${market} named watchlists`}>
       <div className="named-watchlist-heading">
         <div>
           <strong>Named watchlists</strong>
-          <span>{market.toUpperCase()} · {marketLists.length}/20 lists</span>
+          <span>{market.toUpperCase()} · {marketLists.length} lists ({collection.lists.length}/20 total)</span>
         </div>
         <label>
           <span>Active list</span>
