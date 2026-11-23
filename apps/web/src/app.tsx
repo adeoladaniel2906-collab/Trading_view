@@ -157,7 +157,7 @@ export function App() {
         </div>
 
         <div className={`chart-grid chart-grid-${workspace.layout}`} data-layout={workspace.layout}>
-          {workspace.panels.map((panel, index) => (
+          {workspace.panels.map((panel) => (
             <ChartPanel
               key={panel.id}
               panel={panel}
