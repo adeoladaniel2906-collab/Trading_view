@@ -94,8 +94,8 @@ export function App() {
                 for (const candle of parsed.data.candles) merged.set(candle.time, candle);
                 return [...merged.values()].sort((a, b) => a.time - b.time);
               });
-              setLiveCandle((current) => current && current.time > (parsed.data.candles.at(-1)?.time ?? 0) ? current : null);
-              setFeedStatus("live");
+              setLiveCandle((current) => current && current.time >= (parsed.data.candles.at(-1)?.time ?? 0) ? current : null);
+              setFeedStatus("connecting");
             }
           })
           .catch(() => { if (active) setFeedStatus("degraded"); });
@@ -148,7 +148,7 @@ export function App() {
         for (const candle of parsed.data.candles) merged.set(candle.time, candle);
         return [...merged.values()].sort((a, b) => a.time - b.time);
       });
-      setLiveCandle((current) => current && current.time > parsed.data.reconciledThrough ? current : null);
+      setLiveCandle((current) => current && current.time >= parsed.data.reconciledThrough ? current : null);
       setFeedStatus(parsed.data.unresolvedFrom === null ? "live" : "degraded");
     });
 
