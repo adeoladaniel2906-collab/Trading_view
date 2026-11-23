@@ -64,3 +64,48 @@ export const marketCandlesResponseSchema = z.object({
 
 export type MarketCandlesQuery = z.infer<typeof marketCandlesQuerySchema>;
 export type MarketCandlesResponse = z.infer<typeof marketCandlesResponseSchema>;
+
+
+export const liveMarketNameSchema = z.enum(["crypto", "forex"]);
+export type LiveMarketName = z.infer<typeof liveMarketNameSchema>;
+
+export interface LiveMarketRequest {
+  readonly market: LiveMarketName;
+  readonly symbol: string;
+  readonly timeframe: Timeframe;
+}
+
+const liveMarketBaseSchema = z.object({
+  market: liveMarketNameSchema,
+  provider: z.string().min(1).max(32),
+  symbol: z.string().min(1).max(32),
+  timestamp: z.number().int().positive(),
+  receivedAt: z.number().int().positive(),
+});
+
+export const liveMarketEventSchema = z.discriminatedUnion("kind", [
+  liveMarketBaseSchema.extend({
+    kind: z.literal("candle"),
+    market: z.literal("crypto"),
+    timeframe: timeframeSchema,
+    candle: candleSchema,
+    closed: z.boolean(),
+  }).strict(),
+  liveMarketBaseSchema.extend({
+    kind: z.literal("price"),
+    market: z.literal("forex"),
+    price: z.number().finite().positive(),
+    bid: z.number().finite().positive().optional(),
+    ask: z.number().finite().positive().optional(),
+  }).strict().superRefine((event, context) => {
+    if (event.bid !== undefined && event.ask !== undefined && event.bid > event.ask) {
+      context.addIssue({
+        code: "custom",
+        path: ["bid"],
+        message: "Bid must not exceed ask.",
+      });
+    }
+  }),
+]);
+
+export type LiveMarketEvent = z.infer<typeof liveMarketEventSchema>;
