@@ -23,7 +23,7 @@ Do not persist:
 - Live candles, event streams, or transient pointer/drag state.
 - Undo/redo history, which remains an in-memory interaction detail.
 
-Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and a known v1-to-v2 migration that defaults newly introduced indicator toggles to disabled. Unknown future schema versions are never auto-migrated.
+Use explicit schema versions, strict payload size and collection limits, safe handling of unavailable storage, and a known v1-to-v2 migration that defaults newly introduced indicator toggles to disabled. Unknown future or malformed snapshots are never auto-migrated or overwritten; the UI reports that persistence is unavailable until the data is resolved.
 
 ## Alternatives considered
 
