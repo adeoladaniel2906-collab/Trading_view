@@ -74,7 +74,7 @@ export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyM
       crosshairMarkerVisible: false,
     });
     const emaSeries = chart.addSeries(LineSeries, {
-      color: "#6aa9f4",
+      color: "#a9b4c3",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
