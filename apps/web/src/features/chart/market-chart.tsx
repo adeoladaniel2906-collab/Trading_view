@@ -158,6 +158,8 @@ export function MarketChart({
       setSelectedId((selected) => next.drawings.some((drawing) => drawing.id === selected) ? selected : null);
       setDragState(null);
       setDragPreview(null);
+      setEditingId(null);
+      setLabelDraft("");
       setHistory(next);
     });
     return unsubscribe;
