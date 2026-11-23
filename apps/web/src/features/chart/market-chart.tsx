@@ -328,7 +328,7 @@ export function MarketChart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    const series = currentPriceSeries;
+    const series = priceSeriesSnapshot;
     if (!chart || !series) return;
     if (!syncCrosshair || crosshairTime === null) {
       if (lastAppliedCrosshairTimeRef.current !== null) {
@@ -352,7 +352,7 @@ export function MarketChart({
     chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
     isApplyingCrosshairRef.current = false;
     lastAppliedCrosshairTimeRef.current = target.time;
-  }, [availableCandles, crosshairTime, currentPriceSeries, syncCrosshair]);
+  }, [availableCandles, crosshairTime, priceSeriesSnapshot, syncCrosshair]);
 
   useEffect(() => {
     const series = priceSeriesRef.current;
