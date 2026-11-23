@@ -153,7 +153,7 @@ test("live stream route returns unavailable when no hub is configured", async ()
 });
 
 
-test("Binance adapter multiplexes a live kline stream and normalizes candle updates", () => {
+test("Binance adapter multiplexes a live kline stream and normalizes candle updates", async () => {
   const sockets: FakeSocket[] = [];
   const provider = new BinanceLiveProvider((url) => {
     assert.equal(url, "wss://stream.binance.com:9443/stream");
@@ -188,6 +188,7 @@ test("Binance adapter multiplexes a live kline stream and normalizes candle upda
   }
 
   unsubscribe();
+  await new Promise((resolve) => setTimeout(resolve, 300));
   assert.deepEqual(JSON.parse(socket.sent[1] ?? "{}").method, "UNSUBSCRIBE");
   provider.close();
 });
