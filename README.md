@@ -4,6 +4,8 @@ An independent market-charting and analysis platform. The repository does not pr
 
 ## Architecture
 
+The implemented baseline and proposed target design are documented in [the Architecture Blueprint](docs/ARCHITECTURE_BLUEPRINT.md). It distinguishes current capabilities from planned components and defines security boundaries, quality gates, and the staged roadmap.
+
 - apps/web: React, TypeScript, Vite, and TradingView Lightweight Charts.
 - apps/api: Fastify HTTP API, server-side market-data credentials, and provider adapters.
 - packages/contracts: shared Zod schemas and TypeScript contracts.
