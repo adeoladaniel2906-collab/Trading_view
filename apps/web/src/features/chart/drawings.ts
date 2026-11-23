@@ -67,6 +67,7 @@ export type DrawingCommand =
   | { readonly type: "set-locked"; readonly id: string; readonly locked: boolean };
 
 export interface DrawingHistoryState {
+  readonly context: DrawingContext | null;
   readonly drawings: readonly ChartDrawing[];
   readonly undoStack: readonly (readonly ChartDrawing[])[];
   readonly redoStack: readonly (readonly ChartDrawing[])[];
@@ -88,7 +89,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isDrawingKind(value: unknown): value is DrawingKind {
-  return typeof value === "string" && value in ANCHOR_COUNTS;
+  return typeof value === "string" && Object.keys(ANCHOR_COUNTS).includes(value);
 }
 
 function isDrawingColor(value: unknown): value is DrawingColor {
@@ -207,6 +208,7 @@ export function validateDrawing(value: unknown): ChartDrawing {
 
 function snapshot(state: DrawingHistoryState): DrawingHistoryState {
   return {
+    context: state.context,
     drawings: state.drawings,
     undoStack: [...state.undoStack, state.drawings].slice(-MAX_DRAWING_HISTORY),
     redoStack: [],
@@ -232,7 +234,7 @@ export function createDrawingHistory(
   if (context && validated.some((drawing) => !sameContext(drawing.context, context))) {
     throw new RangeError("A drawing collection cannot mix chart contexts");
   }
-  return { drawings: validated, undoStack: [], redoStack: [] };
+  return { context: context ?? null, drawings: validated, undoStack: [], redoStack: [] };
 }
 
 export function applyDrawingCommand(
@@ -247,11 +249,14 @@ export function applyDrawingCommand(
     if (state.drawings.some((item) => item.id === drawing.id)) {
       throw new RangeError("Drawing IDs must be unique");
     }
-    const context = state.drawings[0]?.context;
-    if (context && !sameContext(context, drawing.context)) {
+    if (state.context && !sameContext(state.context, drawing.context)) {
       throw new RangeError("Drawing context does not match this chart context");
     }
-    return { ...snapshot(state), drawings: [...state.drawings, drawing] };
+    return {
+      ...snapshot(state),
+      context: state.context ?? drawing.context,
+      drawings: [...state.drawings, drawing],
+    };
   }
 
   const current = findDrawing(state, command.id);
@@ -296,6 +301,7 @@ export function undoDrawing(state: DrawingHistoryState): DrawingHistoryState {
   const previous = state.undoStack.at(-1);
   if (!previous) return state;
   return {
+    context: state.context,
     drawings: previous,
     undoStack: state.undoStack.slice(0, -1),
     redoStack: [...state.redoStack, state.drawings].slice(-MAX_DRAWING_HISTORY),
@@ -306,6 +312,7 @@ export function redoDrawing(state: DrawingHistoryState): DrawingHistoryState {
   const next = state.redoStack.at(-1);
   if (!next) return state;
   return {
+    context: state.context,
     drawings: next,
     undoStack: [...state.undoStack, state.drawings].slice(-MAX_DRAWING_HISTORY),
     redoStack: state.redoStack.slice(0, -1),
