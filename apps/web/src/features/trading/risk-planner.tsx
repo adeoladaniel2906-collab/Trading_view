@@ -42,7 +42,6 @@ function NumberField({
 
 export function RiskPlanner() {
   const [input, setInput] = useState<RiskPlanInput>(INITIAL_INPUT);
-  const [error, setError] = useState<string | null>(null);
   const result = useMemo(() => {
     try {
       const plan = calculateRiskPlan(input);
@@ -57,7 +56,6 @@ export function RiskPlanner() {
 
   const update = <K extends keyof RiskPlanInput>(key: K, value: RiskPlanInput[K]) => {
     setInput((current) => ({ ...current, [key]: value }));
-    setError(null);
   };
 
   const format = (value: number) => new Intl.NumberFormat(undefined, {
