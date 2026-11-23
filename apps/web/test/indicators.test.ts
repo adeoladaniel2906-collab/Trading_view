@@ -146,6 +146,9 @@ test("indicator catalogue declares overlay and oscillator families", () => {
     "sma", "ema", "wma", "vwma", "bollinger", "vwap", "rsi", "macd", "atr", "stochastic", "obv",
   ]);
   assert.equal(INDICATOR_CATALOG.find((item) => item.id === "rsi")?.pane, "oscillator");
+  assert.equal(INDICATOR_CATALOG.find((item) => item.id === "wma")?.pane, "overlay");
+  assert.equal(INDICATOR_CATALOG.find((item) => item.id === "stochastic")?.pane, "oscillator");
+  assert.equal(INDICATOR_CATALOG.find((item) => item.id === "obv")?.pane, "oscillator");
 });
 
 test("indicators reject invalid periods and band multipliers", () => {
