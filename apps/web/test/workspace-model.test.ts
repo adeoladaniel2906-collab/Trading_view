@@ -44,7 +44,7 @@ test("shrinking the layout preserves surviving panels and selects a valid active
 
 test("invalid layout and active panel IDs are rejected", () => {
   const state = createWorkspaceState(ids());
-  assert.throws(() => resizeWorkspace(state, 3 as 1, ids()), /1, 2, or 4/);
+  assert.throws(() => resizeWorkspace(state, 3 as unknown as 1, ids()), /1, 2, or 4/);
   assert.throws(() => selectActivePanel(state, "missing"), /must exist/);
 });
 
