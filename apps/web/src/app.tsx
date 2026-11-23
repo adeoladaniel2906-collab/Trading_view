@@ -90,7 +90,7 @@ export function App() {
             <p className="eyebrow">Chart workspace</p>
             <h2 id="chart-title">Multi-chart analysis</h2>
           </div>
-          <div className="workspace-layout-controls" role="group" aria-label="Chart layout">
+          <fieldset className="workspace-layout-controls"><legend>Chart layout</legend>
             {LAYOUT_OPTIONS.map((layout) => (
               <button
                 key={layout}
@@ -102,7 +102,7 @@ export function App() {
                 {layout === 1 ? "1 chart" : `${layout} charts`}
               </button>
             ))}
-          </div>
+          </fieldset>
         </div>
 
         <div className="workspace-settings">
