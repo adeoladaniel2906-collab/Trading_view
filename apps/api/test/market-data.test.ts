@@ -154,3 +154,27 @@ test("asset-routed historical candles select the provider for the requested mark
     await app.close();
   }
 });
+
+
+test("asset-routed candles reject timeframes unsupported by the selected provider", async () => {
+  const forexProvider: MarketDataProvider = {
+    id: "twelve-data",
+    supportsTimeframe(timeframe) {
+      return timeframe === "1m" || timeframe === "5m";
+    },
+    async getCandles() {
+      return validCandles;
+    },
+  };
+  const app = await buildApp(config, { marketDataProviders: { forex: forexProvider } });
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/markets/forex/EUR%2FUSD/candles?timeframe=1s",
+    });
+    assert.equal(response.statusCode, 422);
+    assert.equal(response.json().error.code, "TIMEFRAME_UNSUPPORTED");
+  } finally {
+    await app.close();
+  }
+});
