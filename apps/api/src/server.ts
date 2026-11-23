@@ -4,6 +4,7 @@ import { TwelveDataProvider } from "./market-data/twelve-data-provider.js";
 import { BinanceLiveProvider } from "./market-data/live/binance-provider.js";
 import { TwelveDataLiveProvider } from "./market-data/live/twelve-data-provider.js";
 import { LiveMarketDataHub } from "./market-data/live/hub.js";
+import type { LiveMarketDataProvider } from "./market-data/live/provider.js";
 
 async function start(): Promise<void> {
   const config = loadConfig();
@@ -11,7 +12,7 @@ async function start(): Promise<void> {
     config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED
       ? new TwelveDataProvider(config.TWELVE_DATA_API_KEY)
       : undefined;
-  const liveProviders = [new BinanceLiveProvider()];
+  const liveProviders: LiveMarketDataProvider[] = [new BinanceLiveProvider()];
   if (config.TWELVE_DATA_API_KEY && config.TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED) {
     liveProviders.push(new TwelveDataLiveProvider(config.TWELVE_DATA_API_KEY));
   }
