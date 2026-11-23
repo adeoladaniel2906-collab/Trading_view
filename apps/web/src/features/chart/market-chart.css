@@ -228,3 +228,10 @@
   color: #efb4a8;
   font-size: 11px;
 }
+
+.market-chart-shell.is-compact .market-chart-stage {
+  min-height: 320px;
+}
+.market-chart-shell.is-compact .market-chart-stage .market-chart-canvas {
+  height: 320px;
+}
