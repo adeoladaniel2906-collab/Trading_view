@@ -67,14 +67,13 @@ test("candle interval calculation handles fixed and calendar-month intervals", (
 });
 
 test("Binance recovery coverage rejects missing intervals", () => {
-  const candles = [
-    { time: 1_700_000_000, open: 10, high: 12, low: 9, close: 11 },
-    { time: 1_700_000_120, open: 11, high: 13, low: 10, close: 12 },
-  ];
+  const first = { time: 1_700_000_000, open: 10, high: 12, low: 9, close: 11 };
+  const last = { time: 1_700_000_120, open: 11, high: 13, low: 10, close: 12 };
+  const candles = [first, last];
   assert.equal(hasContinuousCandleCoverage(candles, "1m", 1_700_000_060, 1_700_000_120), false);
   assert.equal(hasContinuousCandleCoverage([
-    candles[0]!,
+    first,
     { time: 1_700_000_060, open: 11, high: 12, low: 10, close: 11 },
-    candles[1]!,
+    last,
   ], "1m", 1_700_000_060, 1_700_000_120), true);
 });
