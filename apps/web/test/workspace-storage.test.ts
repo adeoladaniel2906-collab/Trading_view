@@ -124,6 +124,16 @@ test("storage failures fail closed without throwing into the application", () =>
   assert.equal(readPersistedWorkspace(storage), null);
 });
 
+
+test("writer preserves an existing snapshot from an unsupported future version", () => {
+  const storage = new MemoryStorage();
+  const input = fixture();
+  const original = JSON.stringify({ schemaVersion: 99, payload: "future-format" });
+  storage.setItem(WORKSPACE_STORAGE_KEY, original);
+  assert.equal(writePersistedWorkspace(storage, input.workspace, input.watchlists), false);
+  assert.equal(storage.getItem(WORKSPACE_STORAGE_KEY), original);
+});
+
 test("writer refuses a snapshot that fails the runtime schema", () => {
   const storage = new MemoryStorage();
   const input = fixture();
