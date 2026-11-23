@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import type { Candle, LiveMarketEvent, LiveMarketRequest, Timeframe } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
+import { zonedStartOfDay, zonedStartOfMonth, zonedStartOfWeek } from "../time-zone.js";
 
 interface TwelveDataMessage {
   readonly event?: unknown;
@@ -18,6 +19,9 @@ interface Channel {
   lastTickTime: number | undefined;
 }
 
+/** Twelve Data's Forex aggregate exchange reports market time in Australia/Sydney. */
+export const FOREX_EXCHANGE_TIME_ZONE = "Australia/Sydney";
+
 const intervalSeconds: Partial<Record<Timeframe, number>> = {
   "1s": 1, "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1_800,
   "1h": 3_600, "2h": 7_200, "4h": 14_400, "6h": 21_600, "8h": 28_800,
@@ -31,11 +35,13 @@ function numeric(value: unknown): number | undefined {
     : parsed;
 }
 
-function bucketStart(timestampSeconds: number, timeframe: Timeframe): number {
-  if (timeframe === "1M") {
-    const date = new Date(timestampSeconds * 1000);
-    return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) / 1000);
+export function bucketStart(timestampSeconds: number, timeframe: Timeframe): number {
+  if (!Number.isSafeInteger(timestampSeconds) || timestampSeconds <= 0) {
+    throw new RangeError("Tick timestamp must be a positive Unix-second integer");
   }
+  if (timeframe === "1d") return zonedStartOfDay(timestampSeconds, FOREX_EXCHANGE_TIME_ZONE);
+  if (timeframe === "1w") return zonedStartOfWeek(timestampSeconds, FOREX_EXCHANGE_TIME_ZONE);
+  if (timeframe === "1M") return zonedStartOfMonth(timestampSeconds, FOREX_EXCHANGE_TIME_ZONE);
   const duration = intervalSeconds[timeframe];
   if (!duration) throw new Error("Unsupported Forex candle timeframe");
   return Math.floor(timestampSeconds / duration) * duration;
