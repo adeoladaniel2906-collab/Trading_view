@@ -18,6 +18,7 @@ import {
   type IndicatorId,
 } from "./indicators";
 import { heikinAshiCandles, type ChartType } from "./chart-types";
+import { nearestCrosshairTarget } from "./crosshair-sync";
 import "./market-chart.css";
 
 interface MarketChartProps {
@@ -31,6 +32,9 @@ interface MarketChartProps {
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
   readonly indicatorParameters: IndicatorParameters;
   readonly chartType: ChartType;
+  readonly syncCrosshair: boolean;
+  readonly crosshairTime: number | null;
+  readonly onCrosshairTime: (time: number | null) => void;
   readonly compact?: boolean;
 }
 type DrawingMode = "none" | DrawingKind;
@@ -72,12 +76,13 @@ function measurementLabel(drawing: ChartDrawing): string {
 
 export function MarketChart({
   candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
-  indicators, indicatorParameters, chartType, compact = false,
+  indicators, indicatorParameters, chartType, syncCrosshair, crosshairTime, onCrosshairTime, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const priceSeriesRef = useRef<PriceSeries | null>(null);
   const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
+  const lastAppliedCrosshairTimeRef = useRef<number | null>(null);
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
   const cancelLabelEditRef = useRef(false);
   const activeKey = contextKey(market, symbol, timeframe);
@@ -301,6 +306,43 @@ export function MarketChart({
       });
     }
   }, [chartType]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !syncCrosshair) return;
+    const handleCrosshairMove = (event: MouseEventParams<Time>) => {
+      if (typeof event.time !== "number") {
+        lastAppliedCrosshairTimeRef.current = null;
+        onCrosshairTime(null);
+        return;
+      }
+      if (event.time === lastAppliedCrosshairTimeRef.current) return;
+      lastAppliedCrosshairTimeRef.current = null;
+      onCrosshairTime(event.time);
+    };
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    return () => chart.unsubscribeCrosshairMove(handleCrosshairMove);
+  }, [syncCrosshair, onCrosshairTime]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = priceSeriesRef.current;
+    if (!chart || !series) return;
+    if (!syncCrosshair || crosshairTime === null) {
+      if (lastAppliedCrosshairTimeRef.current !== null) chart.clearCrosshairPosition();
+      lastAppliedCrosshairTimeRef.current = null;
+      return;
+    }
+    const target = nearestCrosshairTarget(availableCandles, crosshairTime);
+    if (!target) {
+      chart.clearCrosshairPosition();
+      lastAppliedCrosshairTimeRef.current = null;
+      return;
+    }
+    if (lastAppliedCrosshairTimeRef.current === target.time) return;
+    chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
+    lastAppliedCrosshairTimeRef.current = target.time;
+  }, [availableCandles, crosshairTime, syncCrosshair]);
 
   useEffect(() => {
     const series = priceSeriesRef.current;
