@@ -8,6 +8,7 @@ import {
   stepReplay,
   toggleReplay,
   visibleReplayCandles,
+  type ReplaySpeed,
 } from "../src/features/replay/replay.js";
 
 const candles = Array.from({ length: 5 }, (_, index) => ({
@@ -62,7 +63,7 @@ test("replay speed is restricted to supported deterministic intervals", () => {
   const session = createReplaySession(candles);
   assert.ok(session);
   assert.equal(setReplaySpeed(session, 4).speed, 4);
-  assert.throws(() => setReplaySpeed(session, 3 as 1), /unsupported/);
+  assert.throws(() => setReplaySpeed(session, 3 as unknown as ReplaySpeed), /unsupported/);
 });
 
 test("replay cannot start without enough historical candles", () => {
