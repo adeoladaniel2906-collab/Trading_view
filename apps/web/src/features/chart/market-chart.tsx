@@ -16,10 +16,11 @@ interface MarketChartProps {
   readonly candles: readonly Candle[];
   readonly liveCandle: Candle | null;
   readonly timeframe: Timeframe;
+  readonly chartLabel: string;
   readonly emptyMessage: string;
 }
 
-export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: MarketChartProps) {
+export function MarketChart({ candles, liveCandle, timeframe, chartLabel, emptyMessage }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -112,7 +113,7 @@ export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: Ma
 
   return (
     <div className="market-chart-shell">
-      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label="BTC USDT live candlestick chart" />
+      <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={chartLabel + " live candlestick chart"} />
       {candles.length === 0 && !liveCandle ? (
         <div className="market-chart-empty" role="status">
           <span className="market-chart-empty-title">Chart engine ready</span>
