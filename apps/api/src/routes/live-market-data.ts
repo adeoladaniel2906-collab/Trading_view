@@ -124,6 +124,7 @@ export async function registerLiveMarketDataRoutes(
     let lastReceivedAt: number | null = null;
     let lastCandleTime: number | null = null;
     let recoveryInFlight = false;
+    let staleReported = false;
     const pending: LiveMarketEvent[] = [];
 
     const cleanup = () => {
@@ -203,6 +204,7 @@ export async function registerLiveMarketDataRoutes(
       }
       lastEventAt = event.timestamp;
       lastReceivedAt = event.receivedAt;
+      staleReported = false;
       sendNamedEvent("market-data", event);
       if (!recoveryInFlight) sendHealth("live");
     };
