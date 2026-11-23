@@ -11,7 +11,7 @@ The application must not pretend that browser-local data is cloud-synchronized o
 
 ## Decision
 
-Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, drawing records, and a separate bounded manual paper-trade journal. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
+Use versioned browser `localStorage` for the current single-browser workspace state, per-panel indicator parameters, named indicator templates, drawing records, and a separate bounded manual paper-trade journal. Validate every loaded snapshot against the current workspace, instrument, indicator, chart-type, and drawing domain constraints before accepting it.
 
 Persist:
 - The bounded 1/2/4-panel workspace and per-panel settings.
