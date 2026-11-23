@@ -5,6 +5,15 @@ import type { ChartType } from "./features/chart/chart-types";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
 import {
+  applyIndicatorTemplate,
+  createIndicatorTemplate,
+  deleteIndicatorTemplate,
+  readIndicatorTemplates,
+  upsertIndicatorTemplate,
+  writeIndicatorTemplates,
+} from "./features/workspace/indicator-templates";
+import type { IndicatorTemplate } from "./features/workspace/indicator-templates";
+import {
   getBrowserStorage,
   readPersistedWorkspace,
   writePersistedWorkspace,
@@ -43,12 +52,21 @@ export function App() {
     sourcePanelId: string;
     time: number;
   } | null>(null);
+  const [indicatorTemplates, setIndicatorTemplates] = useState<IndicatorTemplate[]>(() =>
+    readIndicatorTemplates(getBrowserStorage()));
+  const [templateStorageStatus, setTemplateStorageStatus] = useState<"saved" | "unavailable">("saved");
+  const [templateActionStatus, setTemplateActionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const storage = getBrowserStorage();
     const saved = storage ? writePersistedWorkspace(storage, workspace, watchlist) : false;
     setStorageStatus(saved ? "saved" : "unavailable");
   }, [workspace, watchlist]);
+
+  useEffect(() => {
+    const saved = writeIndicatorTemplates(getBrowserStorage(), indicatorTemplates);
+    setTemplateStorageStatus(saved ? "saved" : "unavailable");
+  }, [indicatorTemplates]);
   const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
     ?? workspace.panels[0];
 
@@ -77,6 +95,44 @@ export function App() {
 
   const changeIndicatorParameter = (panelId: string, parameter: IndicatorParameterKey, value: IndicatorParameterValue) => {
     setWorkspace((current) => updatePanelIndicatorParameter(current, panelId, parameter, value));
+  };
+
+  const saveIndicatorTemplate = (panelId: string, name: string): string | null => {
+    const panel = workspace.panels.find((item) => item.id === panelId);
+    if (!panel) {
+      setTemplateActionStatus("The selected chart panel no longer exists.");
+      return null;
+    }
+    try {
+      const template = createIndicatorTemplate(name, panel, crypto.randomUUID(), Date.now());
+      setIndicatorTemplates((current) => upsertIndicatorTemplate(current, template));
+      setTemplateActionStatus(`Saved “${template.name}”.`);
+      return template.id;
+    } catch (cause) {
+      setTemplateActionStatus(cause instanceof Error ? cause.message : "Unable to save the template.");
+      return null;
+    }
+  };
+
+  const applySavedIndicatorTemplate = (panelId: string, templateId: string) => {
+    const template = indicatorTemplates.find((item) => item.id === templateId);
+    if (!template) {
+      setTemplateActionStatus("That saved template is no longer available.");
+      return;
+    }
+    setWorkspace((current) => ({
+      ...current,
+      panels: current.panels.map((panel) => panel.id === panelId
+        ? applyIndicatorTemplate(panel, template)
+        : panel),
+    }));
+    setTemplateActionStatus(`Applied “${template.name}” to this panel.`);
+  };
+
+  const removeIndicatorTemplate = (templateId: string) => {
+    const template = indicatorTemplates.find((item) => item.id === templateId);
+    setIndicatorTemplates((current) => deleteIndicatorTemplate(current, templateId));
+    setTemplateActionStatus(template ? `Deleted “${template.name}”.` : "Template deleted.");
   };
 
   const changeChartType = (panelId: string, chartType: ChartType) => {
@@ -222,6 +278,12 @@ export function App() {
               onIndicatorChange={(indicator, enabled) => changeIndicator(panel.id, indicator, enabled)}
               onIndicatorParameterChange={(parameter, value) =>
                 changeIndicatorParameter(panel.id, parameter, value)}
+              indicatorTemplates={indicatorTemplates}
+              templateStorageStatus={templateStorageStatus}
+              templateActionStatus={panel.id === workspace.activePanelId ? templateActionStatus : null}
+              onSaveIndicatorTemplate={(name) => saveIndicatorTemplate(panel.id, name)}
+              onApplyIndicatorTemplate={(templateId) => applySavedIndicatorTemplate(panel.id, templateId)}
+              onDeleteIndicatorTemplate={removeIndicatorTemplate}
               onChartTypeChange={(chartType) => changeChartType(panel.id, chartType)}
               compact={workspace.layout !== 1}
               syncCrosshair={workspace.sync.crosshair}
