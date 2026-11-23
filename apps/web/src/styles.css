@@ -718,7 +718,7 @@ body { background: #0b1016; }
 .terminal-chart-grid .chart-panel-controls select { min-height:28px; border-radius:4px; background:#182431; font-size:10px; }
 .chart-timeframe-control { display:grid; gap:4px; flex:0 0 auto; }
 .chart-timeframe-control > span { color:#8290a0; font-size:8px; }
-.chart-timeframe-buttons { display:flex; align-items:center; gap:2px; }
+.chart-timeframe-buttons { display:flex; align-items:center; gap:2px; min-width:0; margin:0; padding:0; border:0; }
 .chart-timeframe-buttons button { min-height:28px; padding:4px 7px; border:1px solid transparent; border-radius:4px; background:transparent; color:#aab6c5; font-size:10px; cursor:pointer; }
 .chart-timeframe-buttons button:hover { background:#1b2734; }
 .chart-timeframe-buttons button[aria-pressed="true"] { border-color:#53643a; background:#202b19; color:#e1f29c; }
