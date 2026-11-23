@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -186,6 +186,7 @@ export function MarketChart({
     setSelectedId(null);
     setDrawingMode(null);
     setPendingAnchor(null);
+    dragRef.current = null;
     pendingAnchorRef.current = null;
     previewRef.current = null;
     setPreviewDrawing(null);
@@ -273,13 +274,15 @@ export function MarketChart({
       if (!projected || distanceToProjectedDrawing(point, projected) > 8) continue;
 
       const anchorPoints = drawing.kind === "horizontal"
-        ? [{ x: width / 2, y: (projected as { kind: "horizontal"; y: number }).y }]
+        ? [{ index: 0, point: { x: width / 2, y: (projected as { kind: "horizontal"; y: number }).y } }]
         : drawing.kind === "vertical"
-          ? [{ x: (projected as { kind: "vertical"; x: number }).x, y: height / 2 }]
-          : drawing.anchors.map(projectAnchor).filter((item): item is PixelPoint => item !== null);
-      const anchorIndex = anchorPoints.findIndex((anchor) =>
-        Math.hypot(point.x - anchor.x, point.y - anchor.y) <= 10);
-      return { drawing, anchorIndex: anchorIndex < 0 ? null : anchorIndex };
+          ? [{ index: 0, point: { x: (projected as { kind: "vertical"; x: number }).x, y: height / 2 } }]
+          : drawing.anchors
+              .map((anchor, index) => ({ index, point: projectAnchor(anchor) }))
+              .filter((item): item is { index: number; point: PixelPoint } => item.point !== null);
+      const nearest = anchorPoints.find((item) =>
+        Math.hypot(point.x - item.point.x, point.y - item.point.y) <= 10);
+      return { drawing, anchorIndex: nearest?.index ?? null };
     }
     return null;
   };
@@ -299,6 +302,9 @@ export function MarketChart({
   const cancelTool = () => {
     setDrawingMode(null);
     setPendingAnchor(null);
+    pendingAnchorRef.current = null;
+    dragRef.current = null;
+    previewRef.current = null;
     setPreviewDrawing(null);
     setInteractionMessage("");
   };
@@ -626,7 +632,7 @@ export function MarketChart({
     const stroke = drawing.style.color;
     const width = drawing.style.lineWidth;
 
-    let shape;
+    let shape: ReactNode;
     if (projected.kind === "horizontal") {
       shape = (
         <line
