@@ -306,6 +306,7 @@ export function MarketChart({
         wickUpColor: "#26a69a", wickDownColor: "#ef5350", priceLineVisible: true,
       });
     }
+    setPriceSeriesRevision((revision) => revision + 1);
   }, [chartType]);
 
   useEffect(() => {
@@ -327,7 +328,7 @@ export function MarketChart({
 
   useEffect(() => {
     const chart = chartRef.current;
-    const series = priceSeriesRef.current;
+    const series = currentPriceSeries;
     if (!chart || !series) return;
     if (!syncCrosshair || crosshairTime === null) {
       if (lastAppliedCrosshairTimeRef.current !== null) {
@@ -351,7 +352,7 @@ export function MarketChart({
     chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
     isApplyingCrosshairRef.current = false;
     lastAppliedCrosshairTimeRef.current = target.time;
-  }, [availableCandles, chartType, crosshairTime, syncCrosshair]);
+  }, [availableCandles, crosshairTime, currentPriceSeries, syncCrosshair]);
 
   useEffect(() => {
     const series = priceSeriesRef.current;
