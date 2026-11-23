@@ -105,8 +105,8 @@ test("Stochastic returns %K and its signal average after their warm-up windows",
   const result = stochasticOscillator(values, 2, 2);
   assert.equal(result.length, 1);
   assert.equal(result[0]?.time, 180);
-  assert.ok(Math.abs((result[0]?.k ?? 0) - (100 / 3 * 2)) < 1e-12);
-  assert.ok(Math.abs((result[0]?.d ?? 0) - (100 / 3 * 2)) < 1e-12);
+  assert.ok(Math.abs((result[0]?.k ?? 0) - (250 / 3)) < 1e-12);
+  assert.ok(Math.abs((result[0]?.d ?? 0) - (250 / 3)) < 1e-12);
 });
 
 test("OBV follows close direction and is unavailable without complete volume", () => {
