@@ -224,14 +224,15 @@ export function ChartPanel({
         </label>
         <div className="chart-timeframe-control">
           <span>TIMEFRAME</span>
-          <div className="chart-timeframe-buttons" role="group" aria-label={`Quick timeframes for ${panel.id}`}>
+          <fieldset className="chart-timeframe-buttons">
+            <legend className="sr-only">{`Quick timeframes for ${panel.id}`}</legend>
             {(["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const)
               .filter((timeframe) => SUPPORTED_TIMEFRAMES[panel.market].includes(timeframe))
               .map((timeframe) => (
                 <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
                   onClick={() => changeTimeframe(timeframe)}>{timeframe}</button>
               ))}
-          </div>
+          </fieldset>
           <label className="chart-timeframe-more">
             <span className="sr-only">All timeframes</span>
             <select aria-label={`All timeframes for ${panel.id}`} value={panel.timeframe}
