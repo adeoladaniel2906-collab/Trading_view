@@ -386,7 +386,7 @@ export function MarketChart({
 
   const undo = useCallback(() => { commitHistory(undoDrawing); setSelectedId(null); }, [commitHistory]);
   const redo = useCallback(() => { commitHistory(redoDrawing); setSelectedId(null); }, [commitHistory]);
-  const cancel = useCallback(() => { setPendingAnchor(null); setMode("none"); }, []);
+  const cancel = useCallback(() => { setPendingAnchor(null); setMode("none"); cancelDrag(); }, [cancelDrag]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
