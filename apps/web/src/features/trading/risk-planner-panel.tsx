@@ -241,10 +241,10 @@ export function RiskPlanner({ market, symbol, timeframe }: RiskPlannerProps) {
                 <label className="trade-journal-notes">
                   <span>Notes</span>
                   <textarea
-                    value={entry.notes}
+                    defaultValue={entry.notes}
                     maxLength={2_000}
                     rows={2}
-                    onChange={(event) => changeNotes(entry, event.currentTarget.value)}
+                    onBlur={(event) => changeNotes(entry, event.currentTarget.value)}
                   />
                 </label>
                 {entry.status === "planned" ? (
