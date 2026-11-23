@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { LiveMarketName, Timeframe } from "@market/contracts";
 import { INDICATOR_CATALOG, type IndicatorId } from "../chart/indicators";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
@@ -9,6 +10,17 @@ import {
 } from "../workspace/workspace-model";
 import { useMarketData } from "../market-data/use-market-data";
 import { MarketChart } from "../chart/market-chart";
+import {
+  advanceReplay,
+  createReplaySession,
+  seekReplay,
+  setReplaySpeed,
+  stepReplay,
+  toggleReplay,
+  visibleReplayCandles,
+  type ReplaySession,
+  type ReplaySpeed,
+} from "../replay/replay";
 
 const STATUS_LABELS = {
   loading: "Loading history",
@@ -49,6 +61,23 @@ export function ChartPanel({
     panel.symbol,
     panel.timeframe,
   );
+  const replayKey = `${panel.market}:${panel.symbol}:${panel.timeframe}`;
+  const [replayState, setReplayState] = useState<{ context: string; session: ReplaySession } | null>(null);
+  const replay = replayState?.context === replayKey ? replayState.session : null;
+
+  useEffect(() => {
+    setReplayState((current) => current?.context === replayKey ? null : current);
+  }, [replayKey]);
+
+  useEffect(() => {
+    if (!replay?.isPlaying) return;
+    const interval = window.setInterval(() => {
+      setReplayState((current) => current?.context === replayKey
+        ? { ...current, session: advanceReplay(current.session) }
+        : current);
+    }, Math.max(100, 1_000 / replay.speed));
+    return () => window.clearInterval(interval);
+  }, [replay?.isPlaying, replay?.speed, replayKey]);
 
   const changeMarket = (market: LiveMarketName) => {
     const symbol = SUPPORTED_SYMBOLS[market][0];
@@ -67,6 +96,18 @@ export function ChartPanel({
     onSelectionChange({ market: panel.market, symbol: panel.symbol, timeframe });
   };
 
+  const startReplay = () => {
+    const session = createReplaySession(candles);
+    if (session) setReplayState({ context: replayKey, session });
+  };
+  const updateReplay = (transform: (session: ReplaySession) => ReplaySession) => {
+    setReplayState((current) => current?.context === replayKey
+      ? { ...current, session: transform(current.session) }
+      : current);
+  };
+  const chartCandles = replay ? visibleReplayCandles(replay) : candles;
+  const chartLiveCandle = replay ? null : liveCandle;
+
   return (
     <section
       className={active ? "chart-panel is-active" : "chart-panel"}
@@ -79,9 +120,9 @@ export function ChartPanel({
           <span className="chart-panel-symbol">{displaySymbol(panel.market, panel.symbol)}</span>
           <span className="chart-panel-timeframe">{panel.timeframe}</span>
         </div>
-        <span className="chart-panel-status" data-status={status} aria-live="polite">
+        <span className="chart-panel-status" data-status={replay ? "replay" : status} aria-live="polite">
           <span className="status-dot" />
-          {STATUS_LABELS[status]}
+          {replay ? "Historical replay" : STATUS_LABELS[status]}
         </span>
       </header>
 
@@ -148,9 +189,53 @@ export function ChartPanel({
         </details>
       </div>
 
+      <fieldset className="chart-replay-controls">
+        <legend className="sr-only">Historical bar replay</legend>
+        {replay ? (
+          <>
+            <span className="chart-replay-progress" aria-live="polite">
+              Replay {replay.cursorIndex + 1} / {replay.sourceCandles.length}
+            </span>
+            <button type="button" onClick={() => updateReplay((session) => stepReplay(session, -1))}
+              disabled={replay.cursorIndex === 0}>Step back</button>
+            <button type="button" onClick={() => updateReplay(toggleReplay)}>
+              {replay.isPlaying ? "Pause" : "Play"}
+            </button>
+            <button type="button" onClick={() => updateReplay((session) => stepReplay(session, 1))}
+              disabled={replay.cursorIndex >= replay.sourceCandles.length - 1}>Step forward</button>
+            <label>
+              Speed
+              <select value={replay.speed}
+                onChange={(event) => updateReplay((session) =>
+                  setReplaySpeed(session, Number(event.currentTarget.value) as ReplaySpeed))}>
+                <option value="0.5">0.5×</option>
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+            <input type="range" min={0} max={replay.sourceCandles.length - 1}
+              value={replay.cursorIndex} aria-label="Replay candle position"
+              onChange={(event) => updateReplay((session) =>
+                seekReplay(session, Number(event.currentTarget.value)))} />
+            <button type="button" onClick={() => updateReplay((session) => seekReplay(session, 0))}>
+              Reset
+            </button>
+            <button type="button" onClick={() => setReplayState(null)}>Exit replay</button>
+          </>
+        ) : (
+          <button type="button" onClick={startReplay} disabled={candles.length < 2}>
+            Replay historical candles
+          </button>
+        )}
+        <span className="chart-replay-note">
+          Replay uses a fixed historical snapshot. Indicators only receive candles up to the replay cursor.
+        </span>
+      </fieldset>
+
       <MarketChart
-        candles={candles}
-        liveCandle={liveCandle}
+        candles={chartCandles}
+        liveCandle={chartLiveCandle}
         timeframe={panel.timeframe}
         market={panel.market}
         symbol={panel.symbol}

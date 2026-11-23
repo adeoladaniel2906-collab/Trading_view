@@ -285,3 +285,62 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
   color: #a9b4c3;
   font-size: 10px;
 }
+
+
+.chart-replay-controls {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-bottom: 1px solid #2a3544;
+  background: #151c26;
+  color: #a9b4c3;
+  font-size: 10px;
+}
+.chart-replay-controls button,
+.chart-replay-controls select {
+  min-height: 29px;
+  padding: 5px 8px;
+  border: 1px solid #344253;
+  border-radius: 6px;
+  background: #1c2633;
+  color: #d8e0ea;
+  font: inherit;
+}
+.chart-replay-controls button {
+  cursor: pointer;
+}
+.chart-replay-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.chart-replay-controls button:focus-visible,
+.chart-replay-controls select:focus-visible,
+.chart-replay-controls input:focus-visible {
+  outline: 2px solid #d9f36a;
+  outline-offset: 2px;
+}
+.chart-replay-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chart-replay-controls input[type="range"] {
+  flex: 1 1 120px;
+  min-width: 100px;
+  accent-color: #d9f36a;
+}
+.chart-replay-progress {
+  color: #e8edf5;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.chart-replay-note {
+  flex-basis: 100%;
+  color: #8491a2;
+  line-height: 1.5;
+}
