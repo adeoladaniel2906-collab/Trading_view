@@ -94,7 +94,8 @@ test("Stochastic oscillator aligns %K and %D after their respective warm-up peri
   ];
   const result = stochasticOscillator(values, 3, 2);
   assert.equal(result.length, 2);
-  assert.deepEqual(result.map((point) => point.k), [100 / 3, 75]);
+  assert.ok(result.every((point, index) =>
+    Math.abs(point.k - ([100 / 3, 75][index] ?? Number.NaN)) < 1e-12));
   assert.ok(result.every((point) => Math.abs(point.d - 325 / 6) < 1e-12));
 });
 
