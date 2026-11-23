@@ -4,6 +4,20 @@ import type { IndicatorId } from "./features/chart/indicators";
 import type { ChartType } from "./features/chart/chart-types";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
+import { NamedWatchlistManager } from "./features/workspace/named-watchlist-manager";
+import {
+  addWatchlistSymbol,
+  createNamedWatchlist,
+  deleteNamedWatchlist,
+  moveWatchlistSymbol,
+  readNamedWatchlistCollection,
+  removeWatchlistSymbol,
+  renameNamedWatchlist,
+  selectNamedWatchlist,
+  updateWatchlistItemNote,
+  writeNamedWatchlistCollection,
+} from "./features/workspace/named-watchlists";
+import type { NamedWatchlistCollection } from "./features/workspace/named-watchlists";
 import {
   applyIndicatorTemplate,
   createIndicatorTemplate,
@@ -56,6 +70,10 @@ export function App() {
     readIndicatorTemplates(getBrowserStorage()));
   const [templateStorageStatus, setTemplateStorageStatus] = useState<"saved" | "unavailable">("saved");
   const [templateActionStatus, setTemplateActionStatus] = useState<string | null>(null);
+  const [namedWatchlists, setNamedWatchlists] = useState<NamedWatchlistCollection>(() =>
+    readNamedWatchlistCollection(getBrowserStorage()));
+  const [namedWatchlistStorageStatus, setNamedWatchlistStorageStatus] = useState<"saved" | "unavailable">("saved");
+  const [namedWatchlistActionStatus, setNamedWatchlistActionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const storage = getBrowserStorage();
@@ -67,6 +85,11 @@ export function App() {
     const saved = writeIndicatorTemplates(getBrowserStorage(), indicatorTemplates);
     setTemplateStorageStatus(saved ? "saved" : "unavailable");
   }, [indicatorTemplates]);
+
+  useEffect(() => {
+    const saved = writeNamedWatchlistCollection(getBrowserStorage(), namedWatchlists);
+    setNamedWatchlistStorageStatus(saved ? "saved" : "unavailable");
+  }, [namedWatchlists]);
   const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
     ?? workspace.panels[0];
 
@@ -95,6 +118,70 @@ export function App() {
 
   const changeIndicatorParameter = (panelId: string, parameter: IndicatorParameterKey, value: IndicatorParameterValue) => {
     setWorkspace((current) => updatePanelIndicatorParameter(current, panelId, parameter, value));
+  };
+
+  const runWatchlistAction = (operation: () => NamedWatchlistCollection, successMessage: string): boolean => {
+    try {
+      setNamedWatchlists(operation());
+      setNamedWatchlistActionStatus(successMessage);
+      return true;
+    } catch (cause) {
+      setNamedWatchlistActionStatus(cause instanceof Error ? cause.message : "Watchlist update failed.");
+      return false;
+    }
+  };
+
+  const createWatchlist = (name: string): boolean => {
+    if (!activePanel) return false;
+    return runWatchlistAction(
+      () => createNamedWatchlist(namedWatchlists, activePanel.market, name, crypto.randomUUID(), Date.now()),
+      `Created “${name.trim()}”.`,
+    );
+  };
+
+  const selectWatchlist = (listId: string | null) => {
+    if (!activePanel) return;
+    runWatchlistAction(
+      () => selectNamedWatchlist(namedWatchlists, activePanel.market, listId),
+      listId ? "Watchlist selected." : "Watchlist selection cleared.",
+    );
+  };
+
+  const renameWatchlist = (listId: string, name: string): boolean =>
+    runWatchlistAction(
+      () => renameNamedWatchlist(namedWatchlists, listId, name, Date.now()),
+      "Watchlist renamed.",
+    );
+
+  const deleteWatchlist = (listId: string) => {
+    runWatchlistAction(() => deleteNamedWatchlist(namedWatchlists, listId), "Watchlist deleted.");
+  };
+
+  const addSymbolToNamedWatchlist = (listId: string, symbol: string): boolean =>
+    runWatchlistAction(
+      () => addWatchlistSymbol(namedWatchlists, listId, symbol, Date.now()),
+      `Added ${symbol} to the watchlist.`,
+    );
+
+  const removeSymbolFromNamedWatchlist = (listId: string, symbol: string) => {
+    runWatchlistAction(
+      () => removeWatchlistSymbol(namedWatchlists, listId, symbol, Date.now()),
+      `Removed ${symbol} from the watchlist.`,
+    );
+  };
+
+  const moveNamedWatchlistSymbol = (listId: string, symbol: string, direction: "up" | "down") => {
+    runWatchlistAction(
+      () => moveWatchlistSymbol(namedWatchlists, listId, symbol, direction, Date.now()),
+      `Moved ${symbol} ${direction}.`,
+    );
+  };
+
+  const updateNamedWatchlistNote = (listId: string, symbol: string, note: string) => {
+    runWatchlistAction(
+      () => updateWatchlistItemNote(namedWatchlists, listId, symbol, note, Date.now()),
+      `Updated note for ${symbol}.`,
+    );
   };
 
   const saveIndicatorTemplate = (panelId: string, name: string): string | null => {
@@ -265,6 +352,24 @@ export function App() {
               ? <span className="tools-empty">No saved symbols for this market</span>
               : null}
           </nav>
+          {activePanel ? (
+            <NamedWatchlistManager
+              market={activePanel.market}
+              activeSymbol={activePanel.symbol}
+              collection={namedWatchlists}
+              storageStatus={namedWatchlistStorageStatus}
+              actionStatus={namedWatchlistActionStatus}
+              onSelectSymbol={selectWatchlistSymbol}
+              onCreateList={createWatchlist}
+              onSelectList={selectWatchlist}
+              onRenameList={renameWatchlist}
+              onDeleteList={deleteWatchlist}
+              onAddSymbol={addSymbolToNamedWatchlist}
+              onRemoveSymbol={removeSymbolFromNamedWatchlist}
+              onMoveSymbol={moveNamedWatchlistSymbol}
+              onUpdateNote={updateNamedWatchlistNote}
+            />
+          ) : null}
         </div>
 
         <div className={`chart-grid chart-grid-${workspace.layout}`} data-layout={workspace.layout}>
