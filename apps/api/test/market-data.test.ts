@@ -100,3 +100,24 @@ test("market-data route rejects malformed candles from a provider", async () => 
     await app.close();
   }
 });
+
+
+test("market-data route enforces the requested candle limit", async () => {
+  const provider: MarketDataProvider = {
+    id: "oversized-provider",
+    async getCandles() {
+      return validCandles;
+    },
+  };
+  const app = await buildApp(config, { marketDataProvider: provider });
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/markets/AAPL/candles?limit=1",
+    });
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.json().error.code, "UPSTREAM_DATA_INVALID");
+  } finally {
+    await app.close();
+  }
+});
