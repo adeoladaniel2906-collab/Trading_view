@@ -146,6 +146,9 @@ export function MarketChart({
     const latest = loadDrawingHistory(drawingContext, getBrowserStorage());
     historiesRef.current.set(activeKey, latest);
     historyRef.current = latest;
+    setSelectedId((selected) => latest.drawings.some((drawing) => drawing.id === selected) ? selected : null);
+    setDragState(null);
+    setDragPreview(null);
     setHistory(latest);
     const unsubscribe = subscribeDrawingHistory(drawingContext, (next, sourcePanelId) => {
       if (sourcePanelId === panelId) return;
