@@ -57,7 +57,8 @@ export function MarketChart({
   const pendingTrendPointRef = useRef<TrendPoint | null>(null);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>("none");
   const [drawingCount, setDrawingCount] = useState(0);
-  const [redoCount, setRedoCount] = useState(0);\n  const [trendPointPending, setTrendPointPending] = useState(false);
+  const [redoCount, setRedoCount] = useState(0);
+  const [trendPointPending, setTrendPointPending] = useState(false);
 
   const renderDrawing = (record: DrawingRecord): RenderedDrawing | null => {
     const chart = chartRef.current;
