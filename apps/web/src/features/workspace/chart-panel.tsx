@@ -66,7 +66,7 @@ export function ChartPanel({
   const replay = replayState?.context === replayKey ? replayState.session : null;
 
   useEffect(() => {
-    setReplayState(null);
+    setReplayState((current) => current?.context === replayKey ? null : current);
   }, [replayKey]);
 
   useEffect(() => {
@@ -189,7 +189,7 @@ export function ChartPanel({
         </details>
       </div>
 
-      <div className="chart-replay-controls" aria-label="Historical bar replay">
+      <div className="chart-replay-controls" role="group" aria-label="Historical bar replay">
         {replay ? (
           <>
             <span className="chart-replay-progress" aria-live="polite">
