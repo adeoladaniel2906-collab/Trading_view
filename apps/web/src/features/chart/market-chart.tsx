@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
   type IChartApi, type ISeriesApi, type MouseEventParams, type Time, type UTCTimestamp,
@@ -32,6 +32,13 @@ interface IndicatorSeriesGroup {
   readonly histograms: ISeriesApi<"Histogram">[];
 }
 interface ChartPoint { readonly x: number; readonly y: number; }
+interface DragState {
+  readonly drawingId: string;
+  readonly anchorIndex: number | null;
+  readonly pointerStart: DrawingAnchor;
+  readonly originalAnchors: readonly DrawingAnchor[];
+}
+interface DragPreview { readonly drawingId: string; readonly anchors: readonly DrawingAnchor[]; }
 const DEFAULT_STYLE = { color: DRAWING_COLORS[0], lineWidth: 2 as const, lineStyle: "solid" as const };
 
 function contextKey(market: LiveMarketName, symbol: string, timeframe: Timeframe): string {
@@ -69,9 +76,20 @@ export function MarketChart({
   const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [treeOpen, setTreeOpen] = useState(true);
+  const [snapMode, setSnapMode] = useState<DrawingSnapMode>("off");
+  const [keepDrawing, setKeepDrawing] = useState(false);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState("");
   const [viewportRevision, setViewportRevision] = useState(0);
   const [size, setSize] = useState({ width: 0, height: compact ? 320 : 420 });
   const activeKey = contextKey(market, symbol, timeframe);
+  const availableCandles = useMemo(() => {
+    const byTime = new Map(candles.map((candle) => [candle.time, candle]));
+    if (liveCandle) byTime.set(liveCandle.time, liveCandle);
+    return [...byTime.values()].sort((left, right) => left.time - right.time);
+  }, [candles, liveCandle]);
 
   useEffect(() => {
     const current = historiesRef.current.get(activeKey) ?? createDrawingHistory();
@@ -113,6 +131,90 @@ export function MarketChart({
     commit({ type: "add", drawing });
     setSelectedId(drawing.id);
   }, [commit, market, symbol, timeframe]);
+
+  const anchorAt = useCallback((x: number, y: number): DrawingAnchor | null => {
+    const chart = chartRef.current;
+    const series = candleSeriesRef.current;
+    if (!chart || !series) return null;
+    const time = chart.timeScale().coordinateToTime(x);
+    const price = series.coordinateToPrice(y);
+    if (typeof time !== "number" || price === null || !Number.isFinite(price) || price <= 0) return null;
+    return snapDrawingAnchor({ time, price }, availableCandles, snapMode);
+  }, [availableCandles, snapMode]);
+
+  const beginDrag = useCallback((
+    event: ReactPointerEvent<SVGElement>,
+    drawing: ChartDrawing,
+    anchorIndex: number | null,
+  ) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setSelectedId(drawing.id);
+    if (drawing.locked) return;
+    const bounds = containerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const pointerStart = anchorAt(event.clientX - bounds.left, event.clientY - bounds.top);
+    if (!pointerStart) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragState({
+      drawingId: drawing.id,
+      anchorIndex,
+      pointerStart,
+      originalAnchors: drawing.anchors,
+    });
+    setDragPreview({ drawingId: drawing.id, anchors: drawing.anchors });
+  }, [anchorAt]);
+
+  const moveDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!dragState) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const nextPointer = anchorAt(event.clientX - bounds.left, event.clientY - bounds.top);
+    if (!nextPointer) return;
+    const drawing = history.drawings.find((item) => item.id === dragState.drawingId);
+    if (!drawing || drawing.locked) return;
+    const deltaTime = nextPointer.time - dragState.pointerStart.time;
+    const deltaPrice = nextPointer.price - dragState.pointerStart.price;
+    let anchors: DrawingAnchor[];
+    if (dragState.anchorIndex !== null) {
+      anchors = dragState.originalAnchors.map((anchor, index) => {
+        if (index !== dragState.anchorIndex) return anchor;
+        if (drawing.kind === "horizontal") return { ...anchor, price: nextPointer.price };
+        if (drawing.kind === "vertical") return { ...anchor, time: nextPointer.time };
+        return nextPointer;
+      });
+    } else {
+      anchors = dragState.originalAnchors.map((anchor) => {
+        if (drawing.kind === "horizontal") return { ...anchor, price: anchor.price + deltaPrice };
+        if (drawing.kind === "vertical") return { ...anchor, time: anchor.time + deltaTime };
+        return { time: anchor.time + deltaTime, price: anchor.price + deltaPrice };
+      });
+    }
+    if (anchors.length === 2 && (
+      anchors[0]?.time === anchors[1]?.time && anchors[0]?.price === anchors[1]?.price ||
+      drawing.kind === "rectangle" && (
+        anchors[0]?.time === anchors[1]?.time || anchors[0]?.price === anchors[1]?.price
+      ) ||
+      (drawing.kind === "trendline" || drawing.kind === "ray") && anchors[0]?.time === anchors[1]?.time
+    )) return;
+    setDragPreview({ drawingId: drawing.id, anchors });
+  };
+
+  const finishDrag = () => {
+    if (dragState && dragPreview?.drawingId === dragState.drawingId) {
+      const changed = dragPreview.anchors.some((anchor, index) => {
+        const original = dragState.originalAnchors[index];
+        return !original || original.time !== anchor.time || original.price !== anchor.price;
+      });
+      if (changed) commit({ type: "update", id: dragState.drawingId, patch: { anchors: dragPreview.anchors } });
+    }
+    setDragState(null);
+    setDragPreview(null);
+  };
+
+  const cancelDrag = () => {
+    setDragState(null);
+    setDragPreview(null);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -261,10 +363,10 @@ export function MarketChart({
       const price = series.coordinateToPrice(event.point.y);
       const time = chart.timeScale().coordinateToTime(event.point.x);
       if (price === null || typeof time !== "number" || !Number.isFinite(price)) return;
-      const anchor = { time, price };
+      const anchor = snapDrawingAnchor({ time, price }, availableCandles, snapMode);
       if (mode === "horizontal" || mode === "vertical") {
         addDrawing(mode, anchor);
-        setMode("none");
+        if (!keepDrawing) setMode("none");
         return;
       }
       if (!pendingAnchor) { setPendingAnchor(anchor); return; }
@@ -273,11 +375,11 @@ export function MarketChart({
       if (pendingAnchor.time === anchor.time && pendingAnchor.price === anchor.price) return;
       addDrawing(mode, pendingAnchor, anchor);
       setPendingAnchor(null);
-      setMode("none");
+      if (!keepDrawing) setMode("none");
     };
     chart.subscribeClick(handleClick);
     return () => chart.unsubscribeClick(handleClick);
-  }, [mode, pendingAnchor, addDrawing]);
+  }, [mode, pendingAnchor, addDrawing, availableCandles, snapMode, keepDrawing]);
 
   const undo = useCallback(() => { commitHistory(undoDrawing); setSelectedId(null); }, [commitHistory]);
   const redo = useCallback(() => { commitHistory(redoDrawing); setSelectedId(null); }, [commitHistory]);
@@ -309,18 +411,24 @@ export function MarketChart({
   const series = candleSeriesRef.current;
   const renderShape = (drawing: ChartDrawing) => {
     if (!drawing.visible || !chart || !series) return null;
-    const first = drawing.anchors[0];
+    const first = activeDrawing.anchors[0];
     if (!first) return null;
     const start = pointForAnchor(chart, series, first);
     if (!start) return null;
-    const second = drawing.anchors[1];
+    const second = activeDrawing.anchors[1];
     const end = second ? pointForAnchor(chart, series, second) : null;
     const selected = selectedId === drawing.id;
     const strokeWidth = drawing.style.lineWidth + (selected ? 1 : 0);
-    const common = { stroke: drawing.style.color, strokeWidth, strokeDasharray: dashFor(drawing.style.lineStyle),
-      pointerEvents: "stroke" as const, onClick: (event: ReactMouseEvent<SVGElement>) => {
-        event.stopPropagation(); setSelectedId(drawing.id);
-      } };
+    const activeDrawing = dragPreview?.drawingId === drawing.id
+      ? { ...drawing, anchors: dragPreview.anchors }
+      : drawing;
+    const common = {
+      stroke: drawing.style.color,
+      strokeWidth,
+      strokeDasharray: dashFor(drawing.style.lineStyle),
+      pointerEvents: "stroke" as const,
+      onPointerDown: (event: ReactPointerEvent<SVGElement>) => beginDrag(event, drawing, null),
+    };
     if (drawing.kind === "horizontal") return <line key={drawing.id} x1="0" y1={start.y} x2={size.width} y2={start.y} {...common} />;
     if (drawing.kind === "vertical") return <line key={drawing.id} x1={start.x} y1="0" x2={start.x} y2={size.height} {...common} />;
     if (!second || !end) return null;
@@ -354,6 +462,13 @@ export function MarketChart({
         <button type="button" onClick={undo} disabled={!history.undoStack.length} aria-label="Undo drawing">Undo</button>
         <button type="button" onClick={redo} disabled={!history.redoStack.length} aria-label="Redo drawing">Redo</button>
         {mode !== "none" ? <button type="button" onClick={cancel}>Cancel</button> : null}
+        <label className="drawing-option">Snap
+          <select value={snapMode} onChange={(event) => setSnapMode(event.currentTarget.value as DrawingSnapMode)}>
+            <option value="off">Off</option><option value="weak">Weak</option><option value="strong">Strong</option>
+          </select>
+        </label>
+        <label className="drawing-option"><input type="checkbox" checked={keepDrawing}
+          onChange={(event) => setKeepDrawing(event.currentTarget.checked)} /> Keep drawing</label>
         <span className="drawing-hint" aria-live="polite">
           {mode === "none" ? "Drawings are scoped to this symbol and timeframe in this session."
             : mode === "horizontal" || mode === "vertical" ? "Click once to place the line."
@@ -364,8 +479,17 @@ export function MarketChart({
         <div ref={containerRef} className="market-chart-canvas" role="img" aria-label={`${chartLabel} live candlestick chart`} />
         <svg className="drawing-overlay" width={size.width} height={size.height}
           role="img" aria-label={`Drawings on ${chartLabel}`}
-          viewBox={`0 0 ${Math.max(1, size.width)} ${Math.max(1, size.height)}`}>
+          viewBox={`0 0 ${Math.max(1, size.width)} ${Math.max(1, size.height)}`}
+          onPointerMove={moveDrag} onPointerUp={finishDrag} onPointerCancel={cancelDrag}>
           {history.drawings.map(renderShape)}
+          {history.drawings.filter((drawing) => drawing.visible && !drawing.locked && drawing.id === selectedId)
+            .flatMap((drawing) => drawing.anchors.map((anchor, index) => {
+              const point = chart && series ? pointForAnchor(chart, series, anchor) : null;
+              if (!point) return null;
+              return <circle key={`${drawing.id}-handle-${index}`} cx={point.x} cy={point.y} r="5"
+                fill="#151c26" stroke={drawing.style.color} strokeWidth="2" pointerEvents="all"
+                onPointerDown={(event) => beginDrag(event, drawing, index)} />;
+            }))}
         </svg>
       </div>
       {history.drawings.length ? <section className="drawing-object-tree" aria-label="Drawing objects">
@@ -377,11 +501,32 @@ export function MarketChart({
         </div>
         {treeOpen ? <ul>{history.drawings.map((drawing) => <li key={drawing.id}
           className={selectedId === drawing.id ? "is-selected" : ""}>
-          <button type="button" className="drawing-object-select" onClick={() => setSelectedId(drawing.id)}
-            aria-pressed={selectedId === drawing.id}>
-            <span className="drawing-object-color" style={{ backgroundColor: drawing.style.color }} />
-            <span>{drawing.label}</span><small>{drawing.kind}</small>
-          </button>
+          {editingId === drawing.id ? (
+            <input className="drawing-object-label-input" autoFocus maxLength={80} value={labelDraft}
+              aria-label={`Rename ${drawing.kind}`}
+              onChange={(event) => setLabelDraft(event.currentTarget.value)}
+              onBlur={() => {
+                const label = labelDraft.trim();
+                if (label && label !== drawing.label && !drawing.locked) {
+                  commit({ type: "update", id: drawing.id, patch: { label } });
+                }
+                setEditingId(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape") { setEditingId(null); setLabelDraft(drawing.label); }
+              }} />
+          ) : (
+            <button type="button" className="drawing-object-select" onClick={() => setSelectedId(drawing.id)}
+              onDoubleClick={() => {
+                if (drawing.locked) return;
+                setSelectedId(drawing.id); setEditingId(drawing.id); setLabelDraft(drawing.label);
+              }}
+              aria-pressed={selectedId === drawing.id}>
+              <span className="drawing-object-color" style={{ backgroundColor: drawing.style.color }} />
+              <span>{drawing.label}</span><small>{drawing.kind}</small>
+            </button>
+          )}
           <button type="button" onClick={() => commit({ type: "set-visible", id: drawing.id, visible: !drawing.visible })}
             aria-label={`${drawing.visible ? "Hide" : "Show"} ${drawing.label}`}>{drawing.visible ? "Hide" : "Show"}</button>
           <button type="button" onClick={() => commit({ type: "set-locked", id: drawing.id, locked: !drawing.locked })}
