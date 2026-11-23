@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { LiveMarketName, Timeframe } from "@market/contracts";
 import { INDICATOR_CATALOG, type IndicatorId, type PriceSource } from "../chart/indicators";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
@@ -45,6 +45,9 @@ interface ChartPanelProps {
   readonly onIndicatorParameterChange: (parameter: IndicatorParameterKey, value: IndicatorParameterValue) => void;
   readonly onChartTypeChange: (chartType: ChartType) => void;
   readonly compact: boolean;
+  readonly syncCrosshair: boolean;
+  readonly crosshairTime: number | null;
+  readonly onCrosshairTime: (panelId: string, time: number | null) => void;
 }
 
 function displaySymbol(market: LiveMarketName, symbol: string): string {
@@ -60,12 +63,19 @@ export function ChartPanel({
   onIndicatorParameterChange,
   onChartTypeChange,
   compact,
+  syncCrosshair,
+  crosshairTime,
+  onCrosshairTime,
 }: ChartPanelProps) {
   const { candles, liveCandle, status, message } = useMarketData(
     panel.market,
     panel.symbol,
     panel.timeframe,
   );
+  const handleCrosshairTime = useCallback((time: number | null) => {
+    onCrosshairTime(panel.id, time);
+  }, [onCrosshairTime, panel.id]);
+
   const replayKey = `${panel.market}:${panel.symbol}:${panel.timeframe}`;
   const [replayState, setReplayState] = useState<{ context: string; session: ReplaySession } | null>(null);
   const replay = replayState?.context === replayKey ? replayState.session : null;
@@ -329,6 +339,9 @@ export function ChartPanel({
         indicators={panel.indicators}
         indicatorParameters={panel.indicatorParameters}
         chartType={panel.chartType}
+        syncCrosshair={syncCrosshair}
+        crosshairTime={crosshairTime}
+        onCrosshairTime={handleCrosshairTime}
         compact={compact}
         emptyMessage={
           message ||
