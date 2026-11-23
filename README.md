@@ -22,7 +22,7 @@ A server-side Twelve Data adapter is included. It sends the API key using the pr
 
 The adapter is disabled unless both TWELVE_DATA_API_KEY and TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED=true are configured in the API server environment. The second setting is an operator attestation, not an automatic license check. Do not enable it unless the specific subscription and exchange agreements permit displaying the data in this application.
 
-The current Twelve Data Basic/free plan is described as internal non-display usage. Do not use that plan to populate a chart. The Grow tier lists internal display data access and is currently priced from $29/month billed monthly. Confirm current terms, exchange coverage, and pricing before enabling display. No API key or paid subscription is included here.
+The Twelve Data Basic/free plan is described as internal non-display usage. Do not use that plan to populate a chart. Grow lists internal display data access from $29/month, but Basic and Grow WebSocket access is restricted to one test connection and up to 8 permitted symbols. Full WebSocket access starts on Pro, currently listed from $99/month with 500 WebSocket credits. Confirm the exact exchange entitlements and redistribution terms before enabling display. No API key or paid subscription is included here.
 
 Official references:
 - https://twelvedata.com/docs/introduction
@@ -38,7 +38,7 @@ The API now owns a live-data hub and server-side provider connections. The brows
 - Provider adapters own upstream connection lifecycle, reconnect with capped exponential backoff, and resubscribe after reconnect.
 - The hub shares identical market/symbol/timeframe subscriptions across clients and enforces a per-client subscription cap.
 - SSE clients receive normalized events at GET /v1/markets/:market/:symbol/stream?timeframe=1m. Supported markets are crypto and forex.
-- Twelve Data live subscriptions default to a conservative maximum of 8 symbols until the account's actual entitlement is confirmed.
+- Twelve Data live subscriptions default to a conservative maximum of 8 symbols, matching the documented Basic/Grow trial ceiling. Full WebSocket access requires a Pro plan or higher.
 
 Binance support in this phase is Spot market data, not futures or order execution. Twelve Data's price WebSocket provides ticks, not OHLC candles; the chart candle aggregator and frontend EventSource integration are follow-on work. Do not interpret a price tick as a completed candle. No provider credentials are sent to the browser.
 
