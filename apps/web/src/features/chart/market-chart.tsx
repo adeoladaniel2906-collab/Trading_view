@@ -152,6 +152,9 @@ export function MarketChart({
       historiesRef.current.set(activeKey, next);
       historyRef.current = next;
       setDirtyContextKey(activeKey);
+      setSelectedId((selected) => next.drawings.some((drawing) => drawing.id === selected) ? selected : null);
+      setDragState(null);
+      setDragPreview(null);
       setHistory(next);
     });
     return unsubscribe;
