@@ -10,6 +10,7 @@ import {
 } from "./drawings";
 import { loadDrawingHistory, saveDrawingHistory } from "./drawing-storage";
 import { getBrowserStorage } from "../workspace/workspace-storage";
+import type { IndicatorParameters } from "../workspace/workspace-model";
 import {
   averageTrueRange, bollingerBands, exponentialMovingAverage, movingAverageConvergenceDivergence,
   onBalanceVolume, relativeStrengthIndex, simpleMovingAverage, stochasticOscillator,
@@ -28,7 +29,7 @@ interface MarketChartProps {
   readonly chartLabel: string;
   readonly emptyMessage: string;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
-  readonly indicatorParameters: import("../workspace/workspace-model").IndicatorParameters;
+  readonly indicatorParameters: IndicatorParameters;
   readonly chartType: ChartType;
   readonly compact?: boolean;
 }
