@@ -116,7 +116,7 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
   private readonly streams = new Map<string, Set<LiveMarketListener>>();
 
   constructor(
-    private readonly socketFactory: (url: string) => WebSocket = (url) => new WebSocket(url),
+    private readonly socketFactory: (url: string) => WebSocket = (url) => new WebSocket(url, { maxPayload: 1_000_000 }),
     private readonly maximumStreams = 500,
   ) {}
 
