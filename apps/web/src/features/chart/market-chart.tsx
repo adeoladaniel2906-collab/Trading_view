@@ -9,16 +9,17 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { Candle } from "@market/contracts";
+import type { Candle, Timeframe } from "@market/contracts";
 import "./market-chart.css";
 
 interface MarketChartProps {
   readonly candles: readonly Candle[];
   readonly liveCandle: Candle | null;
+  readonly timeframe: Timeframe;
   readonly emptyMessage: string;
 }
 
-export function MarketChart({ candles, liveCandle, emptyMessage }: MarketChartProps) {
+export function MarketChart({ candles, liveCandle, timeframe, emptyMessage }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -43,7 +44,7 @@ export function MarketChart({ candles, liveCandle, emptyMessage }: MarketChartPr
       timeScale: {
         borderColor: "#344253",
         timeVisible: true,
-        secondsVisible: false,
+        secondsVisible: timeframe === "1s",
       },
       localization: { locale: "en-US" },
     });
@@ -65,7 +66,7 @@ export function MarketChart({ candles, liveCandle, emptyMessage }: MarketChartPr
       chartRef.current = null;
       chart.remove();
     };
-  }, []);
+  }, [timeframe]);
 
   useEffect(() => {
     const series = seriesRef.current;
