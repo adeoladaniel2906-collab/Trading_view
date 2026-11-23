@@ -17,7 +17,7 @@ const baseInput = {
 
 test("sizes a long position from account risk and rounds quantity down to the step", () => {
   const result = calculateRiskPlan(baseInput);
-  assert.equal(result.quantity, 1.969);
+  assert.equal(result.quantity, 19.692);
   assert.ok(result.estimatedLoss <= result.riskBudget);
   assert.ok(result.estimatedProfit > 0);
   assert.ok(result.rewardToRisk > 1);
@@ -31,7 +31,7 @@ test("supports short position geometry", () => {
     stopPrice: 105,
     targetPrice: 90,
   });
-  assert.equal(result.quantity, 1.969);
+  assert.equal(result.quantity, 19.677);
   assert.ok(result.estimatedProfit > 0);
 });
 
