@@ -14,7 +14,7 @@ The browser renders charts and calls the API. Provider credentials and upstream 
 
 The chart renderer uses Lightweight Charts 5.3.0. It is a chart-rendering library, not a market-data service. Its required attribution is included in the application footer and root NOTICE file.
 
-The API exposes GET /v1/markets/:symbol/candles. Provider output is validated for finite OHLCV values, valid high/low bounds, non-negative volume, and strictly ascending unique Unix-second timestamps. Volume is optional because some markets do not publish centralized traded volume.
+The API exposes GET /v1/markets/:symbol/candles for the legacy default provider and GET /v1/markets/:market/:symbol/candles for explicit asset-class routing. Crypto history is served by Binance Spot; Forex history is served by Twelve Data when its display-license gate is enabled. Provider output is validated for finite OHLCV values, valid high/low bounds, non-negative volume, and strictly ascending unique Unix-second timestamps. Volume is optional because some markets do not publish centralized traded volume.
 
 ### Twelve Data adapter
 
@@ -33,20 +33,20 @@ Official references:
 
 The API now owns a live-data hub and server-side provider connections. The browser consumes a single Server-Sent Events (SSE) endpoint; it never connects directly to a vendor.
 
-- Crypto Spot: Binance WebSocket kline streams, normalized into the shared candle event contract.
+- Crypto Spot: Binance WebSocket kline streams, normalized into the shared candle event contract. Binance supports 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, and 1M intervals.
 - Forex: Twelve Data WebSocket price events, enabled only when the API key and the existing display-license attestation are configured.
 - Provider adapters own upstream connection lifecycle, reconnect with capped exponential backoff, and resubscribe after reconnect.
 - The hub shares identical market/symbol/timeframe subscriptions across clients and enforces a per-client subscription cap.
 - SSE clients receive normalized events at GET /v1/markets/:market/:symbol/stream?timeframe=1m. Supported markets are crypto and forex.
 - Twelve Data live subscriptions default to a conservative maximum of 8 symbols, matching the documented Basic/Grow trial ceiling. Full WebSocket access requires a Pro plan or higher.
 
-Binance support in this phase is Spot market data, not futures or order execution. Twelve Data's price WebSocket provides ticks, not OHLC candles; the chart candle aggregator and frontend EventSource integration are follow-on work. Do not interpret a price tick as a completed candle. No provider credentials are sent to the browser.
+Binance support in this phase is Spot market data, not futures or order execution. Twelve Data's price WebSocket provides ticks, not OHLC candles; Forex live candle aggregation remains a follow-on task. Do not interpret a price tick as a completed candle. No provider credentials are sent to the browser. The crypto chart currently loads up to 500 historical candles and switches its matching Binance live stream when the interval selector changes.
 
 The current live hub is process-local. A multi-instance deployment will need a shared pub/sub layer and distributed subscription accounting before scaling horizontally.
 
 ## Data contract
 
-Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d, and 1w. The maximum candle request is 2,000 items. If no licensed provider is configured, the endpoint returns 503 instead of inventing prices.
+Supported shared timeframes: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, and 1M. Provider support is asset-specific; the Forex adapter intentionally rejects intervals it does not support rather than silently substituting another interval. The maximum candle request is 2,000 items. If no licensed provider is configured, the endpoint returns 503 instead of inventing prices.
 
 ## Local setup
 
