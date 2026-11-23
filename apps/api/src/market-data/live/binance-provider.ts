@@ -1,5 +1,5 @@
 import WebSocket, { type RawData } from "ws";
-import type { LiveMarketEvent, LiveMarketRequest, Timeframe } from "@market/contracts";
+import { timeframeSchema, type LiveMarketEvent, type LiveMarketRequest, type Timeframe } from "@market/contracts";
 import type { LiveMarketDataProvider, LiveMarketListener } from "./provider.js";
 
 const intervalByTimeframe: Record<Timeframe, string> = {
@@ -81,11 +81,11 @@ function parseKlineMessage(raw: RawData): {
   const stream = typeof envelope.stream === "string"
     ? envelope.stream
     : data.s.toLowerCase() + "@kline";
-  const timeframeMatch = /@kline_(1s|1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$/.exec(
-    typeof envelope.stream === "string" ? envelope.stream : "",
-  );
-  const timeframe = timeframeMatch?.[1] as Timeframe | undefined;
-  if (!timeframe) return undefined;
+  const streamName = typeof envelope.stream === "string" ? envelope.stream : "";
+  const interval = streamName.slice(streamName.lastIndexOf("@kline_") + 7);
+  const timeframeResult = timeframeSchema.safeParse(interval);
+  if (!streamName.includes("@kline_") || !timeframeResult.success) return undefined;
+  const timeframe = timeframeResult.data;
 
   return {
     stream,
