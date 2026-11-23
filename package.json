@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.0.0",
-  "engines": { "node": ">=24.0.0" },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "scripts": {
     "dev": "pnpm --filter @market/contracts build && pnpm --parallel --filter @market/web --filter @market/api dev",
@@ -13,9 +17,11 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check": "biome lint .",
+    "check": "biome lint . --max-diagnostics=100",
     "test": "pnpm -r --if-present test",
     "audit": "pnpm audit --audit-level high"
   },
-  "devDependencies": { "@biomejs/biome": "2.6.8" }
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8"
+  }
 }
