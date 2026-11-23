@@ -6,7 +6,7 @@ const environmentSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   WEB_ORIGINS: z
     .string()
-    .default("http://localhost:5173")
+    .default("http://localhost:5173,http://127.0.0.1:5173")
     .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean))
     .pipe(
       z.array(

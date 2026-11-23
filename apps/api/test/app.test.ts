@@ -11,6 +11,20 @@ const config: AppConfig = {
   TWELVE_DATA_DISPLAY_LICENSE_CONFIRMED: false,
 };
 
+test("API root explains the backend service and exposes safe route templates", async () => {
+  const app = await buildApp(config);
+  try {
+    const response = await app.inject({ method: "GET", url: "/" });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().service, "market-api");
+    assert.equal(response.json().status, "ok");
+    assert.equal(response.json().health, "/health");
+    assert.equal(response.json().endpoints.historicalCandles, "/v1/markets/:market/:symbol/candles");
+  } finally {
+    await app.close();
+  }
+});
+
 test("health endpoint returns service status and security headers", async () => {
   const app = await buildApp(config);
   try {
