@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LiveMarketName } from "@market/contracts";
 import type { IndicatorId } from "./features/chart/indicators";
 import type { ChartType } from "./features/chart/chart-types";
+import { getBrowserStorage, loadWorkspaceState, saveWorkspaceState } from "./features/workspace/workspace-persistence";
 import { RiskPlanner } from "./features/trading/risk-planner-panel";
 import { ChartPanel } from "./features/workspace/chart-panel";
 import {
@@ -19,13 +20,20 @@ import {
 const LAYOUT_OPTIONS: readonly WorkspaceLayout[] = [1, 2, 4];
 
 export function App() {
+  const [initialState] = useState(() => loadWorkspaceState(getBrowserStorage()));
   const [workspace, setWorkspace] = useState(() =>
-    createWorkspaceState(() => crypto.randomUUID()),
+    initialState?.workspace ?? createWorkspaceState(() => crypto.randomUUID()),
   );
-  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>({
-    crypto: ["BTCUSDT", "ETHUSDT"],
-    forex: ["EURUSD", "GBPUSD"],
-  });
+  const [watchlist, setWatchlist] = useState<Record<LiveMarketName, string[]>>(() => ({
+    crypto: [...(initialState?.watchlist.crypto ?? ["BTCUSDT", "ETHUSDT"])],
+    forex: [...(initialState?.watchlist.forex ?? ["EURUSD", "GBPUSD"])],
+  }));
+  const [persistenceStatus, setPersistenceStatus] = useState<"saved" | "unavailable">("saved");
+
+  useEffect(() => {
+    const saved = saveWorkspaceState(getBrowserStorage(), { workspace, watchlist });
+    setPersistenceStatus(saved ? "saved" : "unavailable");
+  }, [workspace, watchlist]);
   const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
     ?? workspace.panels[0];
 
@@ -177,6 +185,9 @@ export function App() {
 
         <div className="workspace-active-note" aria-live="polite">
           Active panel: {activePanel?.symbol ?? "None"} · Changes apply to the active panel unless synchronization is enabled.
+          <span className="workspace-persistence-status">
+            {persistenceStatus === "saved" ? "Saved on this device" : "Local storage unavailable; changes may not survive refresh"}
+          </span>
         </div>
         <RiskPlanner />
       </section>
