@@ -1,3 +1,5 @@
+export const TWELVE_DATA_FOREX_TIME_ZONE = "Australia/Sydney";
+
 export interface ZonedDateParts {
   readonly year: number;
   readonly month: number;
