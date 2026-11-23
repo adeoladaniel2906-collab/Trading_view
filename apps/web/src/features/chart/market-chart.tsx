@@ -8,7 +8,12 @@ import {
   DRAWING_COLORS, applyDrawingCommand, redoDrawing, undoDrawing,
   snapDrawingAnchor, type ChartDrawing, type DrawingAnchor, type DrawingHistoryState, type DrawingKind, type DrawingSnapMode,
 } from "./drawings";
-import { loadDrawingHistory, saveDrawingHistory } from "./drawing-storage";
+import {
+  loadDrawingHistory,
+  publishDrawingHistory,
+  saveDrawingHistory,
+  subscribeDrawingHistory,
+} from "./drawing-storage";
 import { getBrowserStorage } from "../workspace/workspace-storage";
 import type { IndicatorParameters } from "../workspace/workspace-model";
 import {
@@ -27,12 +32,14 @@ interface MarketChartProps {
   readonly timeframe: Timeframe;
   readonly market: LiveMarketName;
   readonly symbol: string;
+  readonly panelId: string;
   readonly chartLabel: string;
   readonly emptyMessage: string;
   readonly indicators: Readonly<Record<IndicatorId, boolean>>;
   readonly indicatorParameters: IndicatorParameters;
   readonly chartType: ChartType;
   readonly syncCrosshair: boolean;
+  readonly syncDrawings: boolean;
   readonly crosshairTime: number | null;
   readonly onCrosshairTime: (time: number | null) => void;
   readonly compact?: boolean;
@@ -75,8 +82,8 @@ function measurementLabel(drawing: ChartDrawing): string {
 }
 
 export function MarketChart({
-  candles, liveCandle, timeframe, market, symbol, chartLabel, emptyMessage,
-  indicators, indicatorParameters, chartType, syncCrosshair, crosshairTime, onCrosshairTime, compact = false,
+  candles, liveCandle, timeframe, market, symbol, panelId, chartLabel, emptyMessage,
+  indicators, indicatorParameters, chartType, syncCrosshair, syncDrawings, crosshairTime, onCrosshairTime, compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -90,6 +97,7 @@ export function MarketChart({
   const drawingContext = useMemo(() => ({ market, symbol, timeframe }), [market, symbol, timeframe]);
   const [history, setHistory] = useState<DrawingHistoryState>(() =>
     loadDrawingHistory(drawingContext, getBrowserStorage()));
+  const historyRef = useRef(history);
   const [historyContextKey, setHistoryContextKey] = useState(activeKey);
   const [dirtyContextKey, setDirtyContextKey] = useState<string | null>(null);
   const [drawingStorageStatus, setDrawingStorageStatus] = useState<"saved" | "unavailable">(() =>
@@ -122,6 +130,7 @@ export function MarketChart({
     const current = historiesRef.current.get(activeKey) ??
       loadDrawingHistory(drawingContext, getBrowserStorage());
     historiesRef.current.set(activeKey, current);
+    historyRef.current = current;
     setHistory(current);
     setHistoryContextKey(activeKey);
     setSelectedId(null);
@@ -133,6 +142,22 @@ export function MarketChart({
   }, [activeKey, drawingContext]);
 
   useEffect(() => {
+    if (!syncDrawings) return;
+    const latest = loadDrawingHistory(drawingContext, getBrowserStorage());
+    historiesRef.current.set(activeKey, latest);
+    historyRef.current = latest;
+    setHistory(latest);
+    const unsubscribe = subscribeDrawingHistory(drawingContext, (next, sourcePanelId) => {
+      if (sourcePanelId === panelId) return;
+      historiesRef.current.set(activeKey, next);
+      historyRef.current = next;
+      setDirtyContextKey(activeKey);
+      setHistory(next);
+    });
+    return unsubscribe;
+  }, [activeKey, drawingContext, panelId, syncDrawings]);
+
+  useEffect(() => {
     if (historyContextKey !== activeKey ||
       (history.drawings.length === 0 && dirtyContextKey !== activeKey)) return;
     const saved = saveDrawingHistory(drawingContext, history.drawings, getBrowserStorage());
@@ -141,21 +166,21 @@ export function MarketChart({
 
   const commit = useCallback((command: Parameters<typeof applyDrawingCommand>[1]) => {
     setDirtyContextKey(activeKey);
-    setHistory((current) => {
-      const next = applyDrawingCommand(current, command);
-      historiesRef.current.set(activeKey, next);
-      return next;
-    });
-  }, [activeKey]);
+    const next = applyDrawingCommand(historyRef.current, command);
+    historyRef.current = next;
+    historiesRef.current.set(activeKey, next);
+    setHistory(next);
+    if (syncDrawings) publishDrawingHistory(drawingContext, next, panelId);
+  }, [activeKey, drawingContext, panelId, syncDrawings]);
 
   const commitHistory = useCallback((transform: (current: DrawingHistoryState) => DrawingHistoryState) => {
     setDirtyContextKey(activeKey);
-    setHistory((current) => {
-      const next = transform(current);
-      historiesRef.current.set(activeKey, next);
-      return next;
-    });
-  }, [activeKey]);
+    const next = transform(historyRef.current);
+    historyRef.current = next;
+    historiesRef.current.set(activeKey, next);
+    setHistory(next);
+    if (syncDrawings) publishDrawingHistory(drawingContext, next, panelId);
+  }, [activeKey, drawingContext, panelId, syncDrawings]);
 
   const addDrawing = useCallback((kind: DrawingKind, first: DrawingAnchor, second?: DrawingAnchor) => {
     const drawing: ChartDrawing = {
