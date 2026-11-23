@@ -1,4 +1,4 @@
-import { timeframeSchema, type LiveMarketRequest } from "@market/contracts";
+import { timeframeSchema, type LiveMarketEvent, type LiveMarketRequest } from "@market/contracts";
 import type { FastifyInstance } from "fastify";
 import type { LiveMarketDataHub } from "../market-data/live/hub.js";
 
@@ -34,44 +34,58 @@ export async function registerLiveMarketDataRoutes(
       timeframe: timeframeResult.data,
     };
 
+    let response: typeof reply.raw | undefined;
+    let closed = false;
+    const pending: LiveMarketEvent[] = [];
+    let unsubscribe: (() => void);
+    try {
+      unsubscribe = hub.subscribe(subscription, request.ip, (event) => {
+        if (closed) return;
+        if (!response) {
+          if (pending.length < 20) pending.push(event);
+          return;
+        }
+        if (!response.destroyed) {
+          response.write("event: market-data\\ndata: " + JSON.stringify(event) + "\\n\\n");
+        }
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "subscription rejected";
+      const limited = /limit|capacity/i.test(reason);
+      request.log.warn({ market, symbol, reason }, "Live market subscription rejected");
+      return reply.code(limited ? 429 : 503).send({
+        error: {
+          code: limited ? "LIVE_SUBSCRIPTION_LIMIT" : "LIVE_MARKET_DATA_UNAVAILABLE",
+          message: limited ? "The live subscription limit has been reached." : "Live market data is temporarily unavailable.",
+        },
+      });
+    }
+
     reply.hijack();
-    const response = reply.raw;
+    response = reply.raw;
     response.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     });
-    response.write("event: ready\ndata: {\"status\":\"connected\"}\n\n");
+    response.write("event: ready\\ndata: {\"status\":\"connected\"}\\n\\n");
+    for (const event of pending) {
+      response.write("event: market-data\\ndata: " + JSON.stringify(event) + "\\n\\n");
+    }
+    pending.length = 0;
 
-    let closed = false;
-    let unsubscribe: (() => void) | undefined;
     const cleanup = () => {
       if (closed) return;
       closed = true;
       clearInterval(heartbeat);
-      unsubscribe?.();
+      unsubscribe();
     };
     const heartbeat = setInterval(() => {
-      if (!response.destroyed) response.write(": keep-alive\n\n");
+      if (!response?.destroyed) response?.write(": keep-alive\\n\\n");
       else cleanup();
     }, 15_000);
     heartbeat.unref?.();
-
-    try {
-      unsubscribe = hub.subscribe(subscription, request.ip, (event) => {
-        if (closed || response.destroyed) return;
-        response.write("event: market-data\ndata: " + JSON.stringify(event) + "\n\n");
-      });
-    } catch (error) {
-      cleanup();
-      response.end();
-      request.log.warn(
-        { market, symbol, reason: error instanceof Error ? error.message : "subscription rejected" },
-        "Live market subscription rejected",
-      );
-      return reply;
-    }
 
     response.on("close", cleanup);
     request.raw.on("aborted", cleanup);
