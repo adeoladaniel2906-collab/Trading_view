@@ -203,6 +203,7 @@ export function summarizeTradeJournal(
   entries: readonly TradeJournalEntry[],
   now: number,
 ): TradeJournalSummary {
+  if (!Number.isFinite(now)) throw new RangeError("Summary timestamp must be finite");
   const date = new Date(now);
   date.setHours(0, 0, 0, 0);
   const dayStart = date.getTime();
