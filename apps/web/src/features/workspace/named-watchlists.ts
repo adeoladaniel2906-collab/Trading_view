@@ -51,22 +51,30 @@ function isUniqueItems(items: readonly NamedWatchlistItem[]): boolean {
 }
 
 export function isValidNamedWatchlist(value: unknown): value is NamedWatchlist {
-  if (!isRecord(value) ||
-    typeof value.id !== "string" || value.id.length < 1 || value.id.length > 128 ||
-    typeof value.name !== "string" || value.name.length < 1 ||
-    value.name.length > MAX_WATCHLIST_NAME_LENGTH || value.name !== value.name.trim() ||
-    !isMarket(value.market) ||
-    !isFiniteTimestamp(value.createdAt) || !isFiniteTimestamp(value.updatedAt) ||
-    value.updatedAt < value.createdAt ||
-    !Array.isArray(value.items) || value.items.length > MAX_WATCHLIST_ITEMS) return false;
+  if (!isRecord(value)) return false;
 
+  const id = value.id;
+  const name = value.name;
+  const market = value.market;
+  const createdAt = value.createdAt;
+  const updatedAt = value.updatedAt;
   const items = value.items;
+
+  if (typeof id !== "string" || id.length < 1 || id.length > 128 ||
+    typeof name !== "string" || name.length < 1 ||
+    name.length > MAX_WATCHLIST_NAME_LENGTH || name !== name.trim() ||
+    !isMarket(market) ||
+    !isFiniteTimestamp(createdAt) || !isFiniteTimestamp(updatedAt) ||
+    updatedAt < createdAt ||
+    !Array.isArray(items) || items.length > MAX_WATCHLIST_ITEMS) return false;
+
+  const supportedSymbols = SUPPORTED_SYMBOLS[market] as readonly string[];
   if (!items.every((item) => isRecord(item) &&
     typeof item.symbol === "string" &&
-    (SUPPORTED_SYMBOLS[value.market] as readonly string[]).includes(item.symbol) &&
+    supportedSymbols.includes(item.symbol) &&
     typeof item.note === "string" && item.note.length <= MAX_WATCHLIST_NOTE_LENGTH &&
     isFiniteTimestamp(item.addedAt) &&
-    item.addedAt >= value.createdAt && item.addedAt <= value.updatedAt)) return false;
+    item.addedAt >= createdAt && item.addedAt <= updatedAt)) return false;
   return isUniqueItems(items as NamedWatchlistItem[]);
 }
 
@@ -126,6 +134,9 @@ export function createNamedWatchlist(
   if (!id || id.length > 128 || normalizedName.length < 1 ||
     normalizedName.length > MAX_WATCHLIST_NAME_LENGTH || !Number.isFinite(now) || now < 0) {
     throw new RangeError("Watchlist name or identity is invalid");
+  }
+  if (collection.lists.some((list) => list.id === id)) {
+    throw new RangeError("Named watchlist ID already exists");
   }
   if (collection.lists.length >= MAX_NAMED_WATCHLISTS) {
     throw new RangeError("Named watchlist limit reached");
