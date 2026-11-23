@@ -4,6 +4,7 @@ import {
   createWorkspaceState,
   resizeWorkspace,
   selectActivePanel,
+  updatePanelChartType,
   updatePanelIndicator,
   updatePanelSelection,
   updateWorkspaceSync,
@@ -40,6 +41,15 @@ test("shrinking the layout preserves surviving panels and selects a valid active
   const shrunk = resizeWorkspace(selected, 2, createId);
   assert.deepEqual(shrunk.panels.map((panel) => panel.id), ["panel-1", "panel-2"]);
   assert.equal(shrunk.activePanelId, "panel-1");
+});
+
+test("chart type settings are independent per panel", () => {
+  const createId = ids();
+  const workspace = resizeWorkspace(createWorkspaceState(createId), 2, createId);
+  const changed = updatePanelChartType(workspace, "panel-2", "heikin-ashi");
+  assert.equal(changed.panels[0]?.chartType, "candles");
+  assert.equal(changed.panels[1]?.chartType, "heikin-ashi");
+  assert.throws(() => updatePanelChartType(workspace, "missing", "line"), /not in the workspace/);
 });
 
 test("indicator settings are isolated to the selected panel", () => {
