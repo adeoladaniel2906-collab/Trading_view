@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { LiveMarketName } from "@market/contracts";
 import type { IndicatorId } from "./features/chart/indicators";
 import type { ChartType } from "./features/chart/chart-types";
@@ -39,6 +39,10 @@ export function App() {
     forex: [...(initialSnapshot?.watchlists.forex ?? ["EURUSD", "GBPUSD"])],
   }));
   const [storageStatus, setStorageStatus] = useState<"saved" | "unavailable">("saved");
+  const [crosshairSyncState, setCrosshairSyncState] = useState<{
+    sourcePanelId: string;
+    time: number;
+  } | null>(null);
 
   useEffect(() => {
     const storage = getBrowserStorage();
@@ -48,11 +52,26 @@ export function App() {
   const activePanel = workspace.panels.find((panel) => panel.id === workspace.activePanelId)
     ?? workspace.panels[0];
 
+  const handleCrosshairTime = useCallback((panelId: string, time: number | null) => {
+    if (!workspace.sync.crosshair) return;
+    setCrosshairSyncState((current) => {
+      if (time === null) return null;
+      if (current?.sourcePanelId === panelId && current.time === time) return current;
+      return { sourcePanelId: panelId, time };
+    });
+  }, [workspace.sync.crosshair]);
+
+  useEffect(() => {
+    if (!workspace.sync.crosshair) setCrosshairSyncState(null);
+  }, [workspace.sync.crosshair]);
+
   const changeLayout = (layout: WorkspaceLayout) => {
+    setCrosshairSyncState(null);
     setWorkspace((current) => resizeWorkspace(current, layout, () => crypto.randomUUID()));
   };
 
   const changeSelection = (panelId: string, selection: PanelSelection) => {
+    setCrosshairSyncState(null);
     setWorkspace((current) => updatePanelSelection(current, panelId, selection));
   };
 
@@ -152,7 +171,16 @@ export function App() {
             />
             Timeframe
           </label>
-          <span className="sync-note">Unsupported target intervals remain unchanged. Crosshair and drawing sync are not enabled yet.</span>
+          <label>
+            <input
+              type="checkbox"
+              checked={workspace.sync.crosshair}
+              onChange={(event) => setWorkspace((current) =>
+                updateWorkspaceSync(current, { crosshair: event.currentTarget.checked }))}
+            />
+            Crosshair
+          </label>
+          <span className="sync-note">Crosshair aligns to the nearest available UTC candle. Drawings remain isolated by exact chart context.</span>
         </div>
 
         <div className="chart-workspace-tools">
@@ -196,6 +224,11 @@ export function App() {
                 changeIndicatorParameter(panel.id, parameter, value)}
               onChartTypeChange={(chartType) => changeChartType(panel.id, chartType)}
               compact={workspace.layout !== 1}
+              syncCrosshair={workspace.sync.crosshair}
+              crosshairTime={
+                crosshairSyncState?.sourcePanelId !== panel.id ? crosshairSyncState?.time ?? null : null
+              }
+              onCrosshairTime={handleCrosshairTime}
             />
           ))}
         </div>
