@@ -86,11 +86,21 @@ export function calculateRiskPlan(input: RiskPlanInput): RiskPlan {
     ? rawQuantity
     : Math.min(rawQuantity, input.maximumQuantity);
 
+  // A JS number cannot represent every integer above MAX_SAFE_INTEGER. Refuse
+  // step counts that cannot be floored reliably instead of risking a wrong size.
+  const rawQuantityUnits = cappedQuantity / input.quantityStep;
+  if (!Number.isFinite(rawQuantityUnits) || rawQuantityUnits > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError("Quantity step is too small for reliable numeric sizing");
+  }
+
   // Always round down to a valid quantity step. Never add an epsilon that can
   // increase the position beyond its risk budget.
-  let quantityUnits = Math.floor(cappedQuantity / input.quantityStep);
+  let quantityUnits = Math.floor(rawQuantityUnits);
   let quantity = quantityUnits * input.quantityStep;
   let estimatedLoss = quantity * estimatedRiskPerUnit;
+  if (!Number.isFinite(estimatedLoss)) {
+    throw new RangeError("Estimated loss exceeds the supported numeric range");
+  }
 
   // Binary floating-point multiplication can land a few ULPs above the budget.
   // If that happens, remove one full step and recalculate from the returned size.
