@@ -71,6 +71,7 @@ export function MarketChart({
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const indicatorSeriesRef = useRef(new Map<IndicatorId, IndicatorSeriesGroup>());
   const historiesRef = useRef(new Map<string, DrawingHistoryState>());
+  const cancelLabelEditRef = useRef(false);
   const [history, setHistory] = useState<DrawingHistoryState>(() => createDrawingHistory());
   const [mode, setMode] = useState<DrawingMode>("none");
   const [pendingAnchor, setPendingAnchor] = useState<DrawingAnchor | null>(null);
@@ -509,6 +510,11 @@ export function MarketChart({
               aria-label={`Rename ${drawing.kind}`}
               onChange={(event) => setLabelDraft(event.currentTarget.value)}
               onBlur={() => {
+                if (cancelLabelEditRef.current) {
+                  cancelLabelEditRef.current = false;
+                  setEditingId(null);
+                  return;
+                }
                 const label = labelDraft.trim();
                 if (label && label !== drawing.label && !drawing.locked) {
                   commit({ type: "update", id: drawing.id, patch: { label } });
@@ -517,7 +523,7 @@ export function MarketChart({
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
-                if (event.key === "Escape") { setEditingId(null); setLabelDraft(drawing.label); }
+                if (event.key === "Escape") { cancelLabelEditRef.current = true; setLabelDraft(drawing.label); setEditingId(null); }
               }} />
           ) : (
             <button type="button" className="drawing-object-select" onClick={() => setSelectedId(drawing.id)}
