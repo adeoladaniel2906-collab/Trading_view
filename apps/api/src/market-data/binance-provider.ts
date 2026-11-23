@@ -24,6 +24,10 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
     this.fetchImpl = fetchImpl;
   }
 
+  supportsTimeframe(timeframe: Timeframe): boolean {
+    return timeframe in binanceInterval;
+  }
+
   async getCandles(request: CandleRequest, signal: AbortSignal): Promise<readonly Candle[]> {
     if (!/^[A-Z0-9]{5,20}$/.test(request.symbol)) {
       throw new Error("Invalid Binance Spot symbol");
