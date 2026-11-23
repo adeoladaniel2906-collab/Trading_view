@@ -196,6 +196,7 @@ export function ChartPanel({
         </label>
         <details className="chart-panel-indicator-menu">
           <summary>Indicators</summary>
+          <div className="chart-panel-indicator-popover">
           <fieldset className="chart-panel-indicators">
             <legend>Available indicators</legend>
             {INDICATOR_CATALOG.map((indicator) => (
@@ -236,6 +237,7 @@ export function ChartPanel({
               </fieldset>
             </div>
           </details>
+          </div>
         </details>
       </div>
 
