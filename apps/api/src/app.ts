@@ -62,7 +62,12 @@ export async function buildApp(config: AppConfig) {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    if (error.validation) {
+    if (
+      error !== null &&
+      typeof error === "object" &&
+      "validation" in error &&
+      error.validation
+    ) {
       return reply.code(400).send({
         error: { code: "BAD_REQUEST", message: "Request validation failed." },
       });
