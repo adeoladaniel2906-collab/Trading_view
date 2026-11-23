@@ -217,6 +217,7 @@ test("Twelve Data adapter keeps its API key server-side and aggregates Forex tic
   });
   socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_000, price: 1.08, bid: 1.079, ask: 1.081 });
   socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_020, price: 1.085 });
+  socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_005, price: 1.07 });
   socket.message({ event: "price", symbol: "EUR/USD", timestamp: 1_700_000_060, price: 1.082 });
 
   assert.equal(events.length, 4);
