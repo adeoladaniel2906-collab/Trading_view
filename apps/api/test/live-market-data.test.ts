@@ -6,7 +6,7 @@ import type { LiveMarketEvent, LiveMarketRequest } from "@market/contracts";
 import { buildApp } from "../src/app.js";
 import { LiveMarketDataHub } from "../src/market-data/live/hub.js";
 import { BinanceLiveProvider } from "../src/market-data/live/binance-provider.js";
-import { TwelveDataLiveProvider } from "../src/market-data/live/twelve-data-provider.js";
+import { TwelveDataLiveProvider, bucketStart } from "../src/market-data/live/twelve-data-provider.js";
 import type { LiveMarketDataProvider, LiveMarketListener } from "../src/market-data/live/provider.js";
 import type { AppConfig } from "../src/config/env.js";
 
@@ -191,6 +191,16 @@ test("Binance adapter multiplexes a live kline stream and normalizes candle upda
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.deepEqual(JSON.parse(socket.sent[1] ?? "{}").method, "UNSUBSCRIBE");
   provider.close();
+});
+
+test("Forex daily, weekly and monthly buckets align to the Sydney exchange calendar", () => {
+  const timestamp = Date.parse("2025-01-08T12:00:00.000Z") / 1000;
+  assert.equal(bucketStart(timestamp, "1d"), Date.parse("2025-01-07T13:00:00.000Z") / 1000);
+  assert.equal(bucketStart(timestamp, "1w"), Date.parse("2025-01-05T13:00:00.000Z") / 1000);
+  assert.equal(bucketStart(timestamp, "1M"), Date.parse("2024-12-31T13:00:00.000Z") / 1000);
+
+  const winterTimestamp = Date.parse("2025-07-01T12:00:00.000Z") / 1000;
+  assert.equal(bucketStart(winterTimestamp, "1d"), Date.parse("2025-06-30T14:00:00.000Z") / 1000);
 });
 
 test("Twelve Data adapter keeps its API key server-side and aggregates Forex ticks into candles", () => {
