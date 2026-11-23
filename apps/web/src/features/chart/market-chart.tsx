@@ -158,7 +158,7 @@ export function MarketChart({
         ref={containerRef}
         className="market-chart-canvas"
         role="img"
-        aria-label={chartLabel + " live candlestick chart"}
+        aria-label={`${chartLabel} live candlestick chart`}
       />
       {candles.length === 0 && !liveCandle ? (
         <div className="market-chart-empty" role="status">
