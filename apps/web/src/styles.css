@@ -53,7 +53,8 @@ h1 { max-width: 720px; margin-bottom: 16px; font-size: clamp(34px, 5vw, 58px); f
   .environment-label { font-size: 9px; }
   .intro { padding: 56px 0 32px; }
   .panel-heading { align-items: flex-start; flex-direction: column; padding: 18px; }
-  .chart-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; }\n  .chart-workspace-tools { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
+  .chart-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .chart-workspace-tools { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
   .chart-market-controls { gap: 12px; }
   .footer { flex-direction: column; }
 }
