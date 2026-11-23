@@ -264,6 +264,49 @@ export function App() {
           <span className="terminal-session">MARKET ANALYSIS</span>
           <span className="terminal-status"><i aria-hidden="true" /> DATA CONNECTION</span>
         </div>
+        <details className="terminal-tools-menu">
+          <summary aria-label="Open additional tools"><span aria-hidden="true">☰</span> Tools</summary>
+          <div className="terminal-tools-popover">
+            <div className="terminal-tools-section">
+              <strong>Watchlists</strong>
+            {activePanel ? (
+              <NamedWatchlistManager market={activePanel.market} activeSymbol={activePanel.symbol}
+                collection={namedWatchlists} storageStatus={namedWatchlistStorageStatus}
+                actionStatus={namedWatchlistActionStatus} onSelectSymbol={selectWatchlistSymbol}
+                onCreateList={createWatchlist} onSelectList={selectWatchlist}
+                onRenameList={renameWatchlist} onDeleteList={deleteWatchlist}
+                onAddSymbol={addSymbolToNamedWatchlist}
+                onRemoveSymbol={removeSymbolFromNamedWatchlist}
+                onMoveSymbol={moveNamedWatchlistSymbol}
+                onUpdateNote={updateNamedWatchlistNote} />
+            ) : null}
+            </div>
+            <div className="terminal-tools-section">
+            <div className="workspace-settings terminal-sync-settings">
+              <span className="tools-label">SYNC PANELS</span>
+              <label><input type="checkbox" checked={workspace.sync.symbol}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { symbol: event.currentTarget.checked }))} /> Symbol</label>
+              <label><input type="checkbox" checked={workspace.sync.timeframe}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { timeframe: event.currentTarget.checked }))} /> Timeframe</label>
+              <label><input type="checkbox" checked={workspace.sync.crosshair}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { crosshair: event.currentTarget.checked }))} /> Crosshair</label>
+              <label><input type="checkbox" checked={workspace.sync.drawings}
+                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
+                  { drawings: event.currentTarget.checked }))} /> Drawings</label>
+              <span className="sync-note">Drawings synchronize only across identical market, symbol and timeframe contexts.</span>
+            </div>
+            </div>
+            {${activePanel ? (
+              <div className="terminal-tools-section">
+                <strong>Risk planning</strong>
+                <RiskPlanner market={activePanel.market} symbol={activePanel.symbol} timeframe={activePanel.timeframe} />
+              </div>
+            ) : null}}
+          </div>
+        </details>
       </header>
 
       <section className="workspace-panel terminal-panel" aria-label="Live market chart workspace">
@@ -330,46 +373,6 @@ export function App() {
           <span>{storageStatus === "saved" ? "WORKSPACE SAVED LOCALLY" : "LOCAL STORAGE UNAVAILABLE"}</span>
         </div>
 
-        <details className="terminal-drawer">
-          <summary>Workspace tools <span>Watchlists · Synchronization · Saved analysis</span></summary>
-          <div className="terminal-drawer-content">
-            {activePanel ? (
-              <NamedWatchlistManager market={activePanel.market} activeSymbol={activePanel.symbol}
-                collection={namedWatchlists} storageStatus={namedWatchlistStorageStatus}
-                actionStatus={namedWatchlistActionStatus} onSelectSymbol={selectWatchlistSymbol}
-                onCreateList={createWatchlist} onSelectList={selectWatchlist}
-                onRenameList={renameWatchlist} onDeleteList={deleteWatchlist}
-                onAddSymbol={addSymbolToNamedWatchlist}
-                onRemoveSymbol={removeSymbolFromNamedWatchlist}
-                onMoveSymbol={moveNamedWatchlistSymbol}
-                onUpdateNote={updateNamedWatchlistNote} />
-            ) : null}
-            <div className="workspace-settings terminal-sync-settings">
-              <span className="tools-label">SYNC PANELS</span>
-              <label><input type="checkbox" checked={workspace.sync.symbol}
-                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
-                  { symbol: event.currentTarget.checked }))} /> Symbol</label>
-              <label><input type="checkbox" checked={workspace.sync.timeframe}
-                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
-                  { timeframe: event.currentTarget.checked }))} /> Timeframe</label>
-              <label><input type="checkbox" checked={workspace.sync.crosshair}
-                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
-                  { crosshair: event.currentTarget.checked }))} /> Crosshair</label>
-              <label><input type="checkbox" checked={workspace.sync.drawings}
-                onChange={(event) => setWorkspace((current) => updateWorkspaceSync(current,
-                  { drawings: event.currentTarget.checked }))} /> Drawings</label>
-              <span className="sync-note">Drawings synchronize only across identical market, symbol and timeframe contexts.</span>
-            </div>
-          </div>
-        </details>
-
-        {activePanel ? (
-          <details className="terminal-risk-drawer">
-            <summary>Position sizing calculator <span>Risk planning tools</span></summary>
-            <RiskPlanner market={activePanel.market} symbol={activePanel.symbol}
-              timeframe={activePanel.timeframe} />
-          </details>
-        ) : null}
       </section>
 
       <footer className="footer terminal-footer">
