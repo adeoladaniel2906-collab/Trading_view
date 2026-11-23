@@ -47,7 +47,7 @@ const DEFAULT_STYLE = { color: DRAWING_COLORS[0], lineWidth: 2 as const, lineSty
 function contextKey(market: LiveMarketName, symbol: string, timeframe: Timeframe): string {
   return `${market}:${symbol}:${timeframe}`;
 }
-function pointForAnchor(chart: IChartApi, series: ISeriesApi<"Candlestick">, anchor: DrawingAnchor): ChartPoint | null {
+function pointForAnchor(chart: IChartApi, series: PriceSeries, anchor: DrawingAnchor): ChartPoint | null {
   const x = chart.timeScale().timeToCoordinate(anchor.time as UTCTimestamp as Time);
   const y = series.priceToCoordinate(anchor.price);
   return x === null || y === null ? null : { x, y };
