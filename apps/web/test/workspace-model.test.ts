@@ -74,7 +74,10 @@ test("symbol and timeframe sync copy only supported selections", () => {
 test("timeframe sync leaves an unsupported target timeframe unchanged", () => {
   const createId = ids();
   const workspace = resizeWorkspace(createWorkspaceState(createId), 2, createId);
-  const synced = updateWorkspaceSync(workspace, { timeframe: true });
+  const forexTarget = updatePanelSelection(workspace, "panel-2", {
+    market: "forex", symbol: "EURUSD", timeframe: "1m",
+  });
+  const synced = updateWorkspaceSync(forexTarget, { timeframe: true });
   const changed = updatePanelSelection(synced, "panel-1", {
     market: "crypto", symbol: "BTCUSDT", timeframe: "1s",
   });
