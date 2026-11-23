@@ -25,6 +25,7 @@ interface MarketChartProps {
   readonly emptyMessage: string;
   readonly showSma: boolean;
   readonly showEma: boolean;
+  readonly compact?: boolean;
 }
 
 type DrawingMode = "none" | "horizontal" | "trendline";
@@ -46,6 +47,7 @@ export function MarketChart({
   emptyMessage,
   showSma,
   showEma,
+  compact = false,
 }: MarketChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -289,7 +291,7 @@ export function MarketChart({
   };
 
   return (
-    <div className="market-chart-shell">
+    <div className={compact ? "market-chart-shell is-compact" : "market-chart-shell"}>
       <div className="drawing-toolbar" role="toolbar" aria-label="Chart drawing tools">
         <button type="button" onClick={() => setDrawingMode("horizontal")} aria-pressed={drawingMode === "horizontal"}>
           Horizontal level
