@@ -26,7 +26,9 @@ export function exponentialMovingAverage(candles: readonly Candle[], period: num
   let seed = 0;
   for (let index = 0; index < period; index += 1) seed += candles[index]?.close ?? 0;
   let previous = seed / period;
-  const result: IndicatorPoint[] = [{ time: candles[period - 1]!.time, value: previous }];
+  const seedCandle = candles[period - 1];
+  if (!seedCandle) return [];
+  const result: IndicatorPoint[] = [{ time: seedCandle.time, value: previous }];
   for (let index = period; index < candles.length; index += 1) {
     const candle = candles[index];
     if (!candle) continue;
