@@ -308,7 +308,7 @@ export function App() {
             <legend className="tools-label">Indicators</legend>
             <label><input type="checkbox" checked={showSma} onChange={(event) => setShowSma(event.currentTarget.checked)} /> SMA 20</label>
             <label><input type="checkbox" checked={showEma} onChange={(event) => setShowEma(event.currentTarget.checked)} /> EMA 20</label>
-          </div>
+          </fieldset>
         </div>
         <MarketChart
           candles={candles}
