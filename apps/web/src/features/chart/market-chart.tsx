@@ -143,7 +143,8 @@ export function MarketChart({
 
   useEffect(() => {
     if (!syncDrawings) return;
-    const latest = loadDrawingHistory(drawingContext, getBrowserStorage());
+    const storage = getBrowserStorage();
+    const latest = storage ? loadDrawingHistory(drawingContext, storage) : historyRef.current;
     historiesRef.current.set(activeKey, latest);
     historyRef.current = latest;
     setSelectedId((selected) => latest.drawings.some((drawing) => drawing.id === selected) ? selected : null);
