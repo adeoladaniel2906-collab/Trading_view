@@ -167,7 +167,10 @@ export class BinanceLiveProvider implements LiveMarketDataProvider {
       const activeStreams = [...this.streams.keys()];
       this.pendingSubscriptions.clear();
       this.pendingUnsubscriptions.clear();
-      if (activeStreams.length) this.queueSubscription("SUBSCRIBE", activeStreams);
+      if (activeStreams.length) {
+        this.queueSubscription("SUBSCRIBE", activeStreams);
+        this.flushControlQueue();
+      }
     });
     socket.on("message", (data) => this.handleMessage(data));
     socket.on("error", () => {
