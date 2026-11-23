@@ -1,3 +1,4 @@
+import type { Candle } from "@market/contracts";
 import {
   timeframeSchema,
   type LiveMarketName,
@@ -334,4 +335,38 @@ export function distanceToSegment(
   const nearestX = start.x + projection * dx;
   const nearestY = start.y + projection * dy;
   return Math.hypot(point.x - nearestX, point.y - nearestY);
+}
+
+export type DrawingSnapMode = "off" | "weak" | "strong";
+
+/** Snap to provider-backed candle timestamps and OHLC values only. */
+export function snapDrawingAnchor(
+  anchor: DrawingAnchor,
+  candles: readonly Candle[],
+  mode: DrawingSnapMode,
+): DrawingAnchor {
+  if (mode === "off" || candles.length === 0) return anchor;
+  let nearest: Candle | undefined;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const candle of candles) {
+    const distance = Math.abs(candle.time - anchor.time);
+    if (distance < nearestDistance) {
+      nearest = candle;
+      nearestDistance = distance;
+    }
+  }
+  if (!nearest) return anchor;
+  if (mode === "weak") return { time: nearest.time, price: anchor.price };
+
+  const prices = [nearest.open, nearest.high, nearest.low, nearest.close];
+  let snappedPrice = prices[0] ?? anchor.price;
+  let priceDistance = Math.abs(snappedPrice - anchor.price);
+  for (const price of prices.slice(1)) {
+    const distance = Math.abs(price - anchor.price);
+    if (distance < priceDistance) {
+      snappedPrice = price;
+      priceDistance = distance;
+    }
+  }
+  return { time: nearest.time, price: snappedPrice };
 }
