@@ -342,7 +342,7 @@ export function MarketChart({
     if (lastAppliedCrosshairTimeRef.current === target.time) return;
     chart.setCrosshairPosition(target.price, target.time as UTCTimestamp as Time, series);
     lastAppliedCrosshairTimeRef.current = target.time;
-  }, [availableCandles, crosshairTime, syncCrosshair]);
+  }, [availableCandles, chartType, crosshairTime, syncCrosshair]);
 
   useEffect(() => {
     const series = priceSeriesRef.current;
