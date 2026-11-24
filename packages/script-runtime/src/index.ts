@@ -37,19 +37,19 @@ function tokenize(source: string, limits: ScriptLimits): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   while (i < source.length) {
-    const c = source[i]!;
+    const c = source.charAt(i);
     if (/\s/.test(c)) { i += 1; continue; }
     const start = i;
     if (/[0-9.]/.test(c)) {
       let text = "";
-      while (i < source.length && /[0-9.]/.test(source[i]!)) text += source[i++]!;
+      while (i < source.length && /[0-9.]/.test(source.charAt(i))) text += source.charAt(i++);
       if (!/^\d+(\.\d+)?$/.test(text)) throw new ScriptError("Invalid numeric literal.", start);
       const value = Number(text);
       if (!Number.isFinite(value)) throw new ScriptError("Numeric literal must be finite.", start);
       tokens.push({ kind: "number", text, offset: start });
     } else if (/[A-Za-z_]/.test(c)) {
       let text = "";
-      while (i < source.length && /[A-Za-z0-9_]/.test(source[i]!)) text += source[i++]!;
+      while (i < source.length && /[A-Za-z0-9_]/.test(source.charAt(i))) text += source[i++]!;
       tokens.push({ kind: "identifier", text, offset: start });
     } else if ("+-*/(),=;".includes(c)) {
       tokens.push({ kind: c as TokenKind, text: c, offset: start }); i += 1;
@@ -65,7 +65,11 @@ class Parser {
   private index = 0;
   private nodes = 0;
   constructor(private readonly tokens: readonly Token[], private readonly limits: ScriptLimits) {}
-  private current(): Token { return this.tokens[this.index]!; }
+  private current(): Token {
+    const token = this.tokens[this.index];
+    if (!token) throw new ScriptError("Unexpected end of token stream.");
+    return token;
+  }
   private take(kind: TokenKind): Token {
     const token = this.current();
     if (token.kind !== kind) throw new ScriptError(`Expected "${kind}" but found "${token.text || "end of script"}".`, token.offset);
@@ -104,7 +108,7 @@ class Parser {
     const precedence: Record<string, number> = { "+": 1, "-": 1, "*": 2, "/": 2 };
     while ((precedence[this.current().kind] ?? -1) >= minPrecedence) {
       const operator = this.current().kind as "+" | "-" | "*" | "/";
-      const p = precedence[operator]!; this.index += 1;
+      const p = precedence[operator] ?? 0; this.index += 1;
       const right = this.expression(p + 1);
       left = this.node({ kind: "binary", operator, left, right });
     }
@@ -121,8 +125,10 @@ class Parser {
       this.index += 1;
       if (this.current().kind !== "(") return this.node({ kind: "variable", name: token.text });
       this.index += 1; const args: Expr[] = [];
-      if (this.current().kind !== ")") {
-        do { args.push(this.expression()); if (this.current().kind !== ",") break; this.index += 1; } while (true);
+      while (this.current().kind !== ")" && this.current().kind !== "eof") {
+        args.push(this.expression());
+        if (this.current().kind !== ",") break;
+        this.index += 1;
       }
       this.take(")");
       return this.node({ kind: "call", name: token.text, args });
@@ -185,25 +191,41 @@ function evaluate(expr: Expr, env: Map<string, ScriptValue>, bars: number, budge
     });
   }
   const args = expr.args.map((arg) => evaluate(arg, env, bars, budget));
+  const first = args[0];
+  if (first === undefined) throw new ScriptError("Missing function argument.");
   if (expr.name === "abs") {
-    const v = args[0]!; return typeof v === "number" ? Math.abs(v) : v.map((x) => x === null ? null : Math.abs(x));
+    return typeof first === "number" ? Math.abs(first) : first.map((x) => x === null ? null : Math.abs(x));
   }
   if (expr.name === "min" || expr.name === "max") {
-    const a = series(args[0]!, bars), b = series(args[1]!, bars);
-    return a.map((x, i) => x === null || b[i] === null || b[i] === undefined ? null
-      : expr.name === "min" ? Math.min(x, b[i]!) : Math.max(x, b[i]!));
+    const second = args[1];
+    if (second === undefined) throw new ScriptError("Missing function argument.");
+    const a = series(first, bars), b = series(second, bars);
+    return a.map((x, i) => {
+      const y = b[i];
+      if (x === null || y === null || y === undefined) return null;
+      return expr.name === "min" ? Math.min(x, y) : Math.max(x, y);
+    });
   }
-  const input = series(args[0]!, bars), periodValue = args[1]!;
+  const second = args[1];
+  if (second === undefined) throw new ScriptError("Missing function argument.");
+  const input = series(first, bars), periodValue = second;
   if (typeof periodValue !== "number" || !Number.isInteger(periodValue) || periodValue < 1 || periodValue > 500) {
     throw new ScriptError(`${expr.name} period must be an integer between 1 and 500.`);
   }
   if (expr.name === "sma") {
-    let sum = 0; const result: (number | null)[] = [];
+    let sum = 0;
+    let missing = 0;
+    const result: (number | null)[] = [];
     for (let i = 0; i < bars; i += 1) {
-      const value = input[i]; if (value === null || value === undefined) { sum = 0; result.push(null); continue; }
-      sum += value;
-      if (i >= periodValue) sum -= input[i - periodValue] ?? 0;
-      result.push(i + 1 < periodValue ? null : sum / periodValue);
+      const value = input[i];
+      if (value === null || value === undefined) missing += 1;
+      else sum += value;
+      if (i >= periodValue) {
+        const expired = input[i - periodValue];
+        if (expired === null || expired === undefined) missing -= 1;
+        else sum -= expired;
+      }
+      result.push(i + 1 >= periodValue && missing === 0 ? sum / periodValue : null);
     }
     return result;
   }
@@ -229,7 +251,7 @@ export function executeScript(source: string, candles: readonly Candle[], limits
     ["open", candles.map((c) => c.open)], ["high", candles.map((c) => c.high)],
     ["low", candles.map((c) => c.low)], ["close", candles.map((c) => c.close)],
   ]);
-  if (candles.every((c) => c.volume !== undefined)) env.set("volume", candles.map((c) => c.volume!));
+  if (candles.every((c) => c.volume !== undefined)) env.set("volume", candles.map((c) => c.volume ?? null));
   const budget = { used: 0, max: limits.maxOperations };
   const plots: ScriptPlot[] = [];
   for (const statement of statements) {
