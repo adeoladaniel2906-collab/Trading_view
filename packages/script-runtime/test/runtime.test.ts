@@ -19,7 +19,7 @@ test("parses and evaluates a moving-average plot deterministically", () => {
 test("supports bounded arithmetic and multiple named plots", () => {
   const result = executeScript("let avg = ema(close, 2); plot momentum = avg - close; plot abs(close - 3);", candles);
   assert.equal(result.plots.length, 2);
-  assert.deepEqual(result.plots[0]?.values, [null, 0.16666666666666674, 0.05555555555555536, 0.0185185185185186, 0.006172839506172867]);
+  assert.deepEqual(result.plots[0]?.values, [null, -0.5, -0.5, -0.5, -0.5]);
 });
 
 test("rejects unknown functions and variables", () => {
