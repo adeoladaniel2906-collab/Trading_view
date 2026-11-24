@@ -198,7 +198,7 @@ export function ChartPanel({
           <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
           <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
         </summary>
-        <div className="chart-timeframe-options" role="group" aria-label={`Timeframes for ${panel.id}`}>
+        <fieldset className="chart-timeframe-options"><legend className="sr-only">{`Timeframes for ${panel.id}`}</legend>
           {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
             <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
               onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
@@ -213,8 +213,8 @@ export function ChartPanel({
       </header>
 
       <div className={mobileToolsOpen ? "chart-tools-dock is-open" : "chart-tools-dock"}>
-        <div className="chart-tools-dock-handle"
-          role="button" tabIndex={0} aria-expanded={mobileToolsOpen}
+        <button type="button" className="chart-tools-dock-handle"
+          aria-expanded={mobileToolsOpen}
           aria-label={mobileToolsOpen ? "Collapse chart tools" : "Expand chart tools"}
           onPointerDown={(event) => { dockPointerStart.current = event.clientY; }}
           onPointerUp={(event) => {
@@ -226,17 +226,11 @@ export function ChartPanel({
               event.preventDefault();
             }
           }}
-          onClick={() => setMobileToolsOpen((open) => !open)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setMobileToolsOpen((open) => !open);
-            }
-          }}>
+          onClick={() => setMobileToolsOpen((open) => !open)}>
           <span className="chart-tools-grip" aria-hidden="true" />
           <span>{mobileToolsOpen ? "Hide chart tools" : "Chart tools"}</span>
           <span aria-hidden="true">{mobileToolsOpen ? "⌄" : "⌃"}</span>
-        </div>
+        </button>
         <div className="chart-tools-dock-content">
       <div className="chart-panel-controls">
         <label>
