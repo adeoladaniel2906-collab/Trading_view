@@ -1,0 +1,93 @@
+/* MT5-style mobile chart-first terminal */
+.chart-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.chart-timeframe-picker { position:relative; margin-left:auto; }
+.chart-timeframe-picker > summary {
+  display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:5px 10px;
+  border:1px solid #354456; border-radius:5px; background:#182431; color:#f2f5f8;
+  font-size:12px; font-weight:700; list-style:none; cursor:pointer;
+}
+.chart-timeframe-picker > summary::-webkit-details-marker { display:none; }
+.chart-timeframe-chevron { color:#9aa8b8; font-size:14px; }
+.chart-timeframe-options {
+  position:absolute; z-index:30; top:calc(100% + 6px); right:0; display:grid;
+  grid-template-columns:repeat(3,minmax(54px,1fr)); gap:4px; min-width:194px;
+  padding:7px; border:1px solid #354456; border-radius:7px;
+  background:#111a24; box-shadow:0 12px 30px rgb(0 0 0 / 38%);
+}
+.chart-timeframe-options button {
+  min-height:34px; border:1px solid transparent; border-radius:4px;
+  background:#1a2633; color:#cbd5df; font-size:11px; font-weight:650; cursor:pointer;
+}
+.chart-timeframe-options button[aria-pressed="true"] {
+  border-color:#9dbb4b; background:#29351d; color:#e5f5ad;
+}
+.chart-tools-dock-handle { display:none; }
+@media (max-width:720px) {
+  html, body, #root { width:100%; min-width:320px; min-height:100%; margin:0; }
+  body { overflow-x:hidden; }
+  .workspace.terminal-shell {
+    display:flex; flex-direction:column; width:100%; min-height:100dvh; height:100dvh;
+    max-width:none; margin:0; padding:0; overflow:hidden; border:0; border-radius:0;
+  }
+  .terminal-topbar { flex:0 0 42px; min-height:42px; padding:0 10px; border-bottom:1px solid #263342; }
+  .terminal-topbar .brand { font-size:10px; }
+  .terminal-topbar .brand-mark { width:22px; height:22px; }
+  .terminal-tools-menu > summary { min-height:30px; padding:6px 9px; }
+  .terminal-panel { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; overflow:hidden; border:0; border-radius:0; }
+  .terminal-marketbar, .terminal-watchlist, .terminal-statusline { display:none !important; }
+  .terminal-chart-grid, .terminal-chart-grid.chart-grid-1 {
+    display:flex; flex:1 1 auto; flex-direction:column; min-height:0; height:100%;
+    gap:0; overflow:hidden; border:0; border-radius:0;
+  }
+  .terminal-chart-grid .chart-panel {
+    display:flex; flex:1 1 auto; flex-direction:column; min-height:0; height:100%;
+    overflow:hidden; border:0; border-radius:0;
+  }
+  .terminal-chart-grid .chart-panel-heading {
+    flex:0 0 38px; min-height:38px; padding:0 10px; border-bottom:1px solid #263342;
+    background:#111a24;
+  }
+  .chart-panel-instrument { display:flex; align-items:center; gap:10px; }
+  .chart-panel-symbol { font-size:12px; }
+  .chart-panel-heading .chart-panel-status { font-size:9px; }
+  .chart-panel-heading .chart-timeframe-picker { margin-left:auto; }
+  .chart-panel-heading .chart-timeframe-picker > summary { min-height:28px; padding:3px 9px; }
+  .chart-tools-dock { flex:0 0 auto; min-height:28px; border-bottom:1px solid #263342; background:#111a24; }
+  .chart-tools-dock-handle {
+    display:flex; align-items:center; justify-content:center; gap:9px; min-height:28px;
+    color:#9aa8b8; font-size:9px; font-weight:650; letter-spacing:.04em;
+    touch-action:pan-y; user-select:none; cursor:ns-resize;
+  }
+  .chart-tools-grip { width:30px; height:3px; border-radius:5px; background:#657487; }
+  .chart-tools-dock-content { display:none; max-height:36dvh; overflow:auto; overscroll-behavior:contain; }
+  .chart-tools-dock.is-open .chart-tools-dock-content { display:block; }
+  .chart-tools-dock.is-open .chart-tools-dock-handle { border-bottom:1px solid #263342; }
+  .chart-tools-dock .chart-panel-controls { display:flex; flex-wrap:wrap; gap:7px; padding:8px; overflow:visible; }
+  .chart-tools-dock .chart-panel-controls > label { min-width:90px; flex:1 1 28%; }
+  .chart-tools-dock .chart-panel-controls > label select { width:100%; }
+  .chart-timeframe-control { flex:0 0 auto; }
+  .chart-timeframe-buttons { display:none !important; }
+  .chart-timeframe-more { display:none !important; }
+  .chart-tools-dock .chart-replay-controls { display:flex; flex-wrap:wrap; gap:6px; padding:7px 9px; }
+  .terminal-chart-grid .market-chart-shell {
+    display:grid; flex:1 1 auto; grid-template-columns:38px minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr) auto; min-height:0; height:100%; overflow:hidden;
+  }
+  .terminal-chart-grid .market-chart-shell .drawing-toolbar {
+    grid-column:1; grid-row:1; display:flex; flex-direction:column; flex-wrap:nowrap;
+    align-items:center; gap:3px; min-height:0; padding:5px 2px; overflow-y:auto;
+  }
+  .terminal-chart-grid .market-chart-shell .drawing-toolbar button {
+    width:32px; min-height:30px; padding:2px; font-size:9px;
+  }
+  .terminal-chart-grid .market-chart-stage {
+    grid-column:2; grid-row:1; min-width:0; min-height:0; height:100%;
+  }
+  .terminal-chart-grid .market-chart-canvas { width:100%; height:100%; min-height:0; }
+  .terminal-chart-grid .drawing-hint { left:5px; bottom:5px; max-width:calc(100% - 10px); }
+  .terminal-chart-grid .drawing-object-tree { grid-column:1 / -1; grid-row:2; }
+  .terminal-chart-grid.chart-grid-2, .terminal-chart-grid.chart-grid-4 { display:grid; grid-template-columns:1fr; grid-template-rows:repeat(2,minmax(0,1fr)); overflow:auto; }
+  .terminal-chart-grid.chart-grid-2 .chart-panel, .terminal-chart-grid.chart-grid-4 .chart-panel { min-height:55dvh; }
+  .terminal-chart-grid.chart-grid-2 .market-chart-shell, .terminal-chart-grid.chart-grid-4 .market-chart-shell { min-height:0; }
+  .terminal-footer { display:none !important; }
+}
