@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @market/contracts build && pnpm --parallel --filter @market/web --filter @market/api dev",
-    "build": "pnpm --filter @market/contracts build && pnpm --filter @market/api build && pnpm --filter @market/web build",
+    "build": "pnpm --filter @market/contracts build && pnpm --filter @market/script-runtime build && pnpm --filter @market/api build && pnpm --filter @market/web build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "biome lint .",
     "format": "biome format --write .",
