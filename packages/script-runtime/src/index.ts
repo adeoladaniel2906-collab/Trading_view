@@ -49,7 +49,7 @@ function tokenize(source: string, limits: ScriptLimits): Token[] {
       tokens.push({ kind: "number", text, offset: start });
     } else if (/[A-Za-z_]/.test(c)) {
       let text = "";
-      while (i < source.length && /[A-Za-z0-9_]/.test(source.charAt(i))) text += source[i++]!;
+      while (i < source.length && /[A-Za-z0-9_]/.test(source.charAt(i))) text += source.charAt(i++);
       tokens.push({ kind: "identifier", text, offset: start });
     } else if ("+-*/(),=;".includes(c)) {
       tokens.push({ kind: c as TokenKind, text: c, offset: start }); i += 1;
