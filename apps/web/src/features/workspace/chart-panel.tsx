@@ -192,7 +192,19 @@ export function ChartPanel({
       <header className="chart-panel-heading">
         <div className="chart-panel-instrument">
           <span className="chart-panel-symbol">{displaySymbol(panel.market, panel.symbol)}</span>
-          <span className="chart-panel-timeframe">{panel.timeframe}</span>
+          <span className="chart-panel-timeframe">${panel.timeframe}</span>
+        <details className="chart-timeframe-control chart-timeframe-picker">
+        <summary aria-label={`Select timeframe, current ${panel.timeframe}`}>
+          <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
+          <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div className="chart-timeframe-options" role="group" aria-label={`Timeframes for ${panel.id}`}>
+          {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
+            <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
+              onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
+          ))}
+        </div>
+      </details>
         </div>
         <span className="chart-panel-status" data-status={replay ? "replay" : status} aria-live="polite">
           <span className="status-dot" />
@@ -250,18 +262,7 @@ export function ChartPanel({
             ))}
           </select>
         </label>
-        <details className="chart-timeframe-control chart-timeframe-picker">
-          <summary aria-label={`Select timeframe, current ${panel.timeframe}`}>
-            <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
-            <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
-          </summary>
-          <div className="chart-timeframe-options" role="group" aria-label={`Timeframes for ${panel.id}`}>
-            {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
-              <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
-                onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
-            ))}
-          </div>
-        </details>
+
         <label>
           <span>Chart type</span>
           <select aria-label={`Chart type for ${panel.id}`} value={panel.chartType}
