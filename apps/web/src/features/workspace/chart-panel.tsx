@@ -192,19 +192,19 @@ export function ChartPanel({
       <header className="chart-panel-heading">
         <div className="chart-panel-instrument">
           <span className="chart-panel-symbol">{displaySymbol(panel.market, panel.symbol)}</span>
-          <span className="chart-panel-timeframe">${panel.timeframe}</span>
-        <details className="chart-timeframe-control chart-timeframe-picker">
-        <summary aria-label={`Select timeframe, current ${panel.timeframe}`}>
-          <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
-          <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
-        </summary>
-        <fieldset className="chart-timeframe-options"><legend className="sr-only">{`Timeframes for ${panel.id}`}</legend>
-          {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
-            <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
-              onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
-          ))}
-        </div>
-      </details>
+          <details className="chart-timeframe-control chart-timeframe-picker">
+            <summary aria-label={`Select timeframe, current ${panel.timeframe}`}>
+              <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
+              <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <fieldset className="chart-timeframe-options">
+              <legend className="sr-only">{`Timeframes for ${panel.id}`}</legend>
+              {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
+                <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
+                  onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
+              ))}
+            </fieldset>
+          </details>
         </div>
         <span className="chart-panel-status" data-status={replay ? "replay" : status} aria-live="polite">
           <span className="status-dot" />
