@@ -1,0 +1,1 @@
+Phase D consumes the Phase C Node worker entrypoint. The package's TypeScript export must resolve to its source declaration during `pnpm typecheck`, because the CI typecheck step runs before the production build emits `dist/*.d.ts`. Runtime imports continue to resolve to the compiled `dist/node.js` after the ordered build step.
