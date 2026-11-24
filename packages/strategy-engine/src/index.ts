@@ -194,8 +194,10 @@ function runSegment(
     if (!Number.isFinite(marked) || marked < 0) throw new BacktestError("Backtest produced an invalid equity value.");
     curve.push({ time: fillCandle.time, equity: marked });
   }
-  const last = candles[curve[curve.length - 1]?.time === undefined ? startIndex : candles.findIndex((c) => c.time === curve[curve.length - 1]?.time)];
-  const markPrice = last?.close ?? first.close;
+  const lastPoint = curve[curve.length - 1];
+  const lastIndex = lastPoint ? candles.findIndex((candle) => candle.time === lastPoint.time) : startIndex;
+  const last = candles[lastIndex] ?? first;
+  const markPrice = last.close;
   const unrealizedPnl = position
     ? position.quantity * markPrice - position.notional - position.entryFee : 0;
   const endingEquity = position ? cash + position.quantity * markPrice : cash;
@@ -222,7 +224,8 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestRes
     strategy: { script: request.script, signal: "SMA/EMA plot crossover" },
     dataset: {
       symbol: request.symbol, timeframe: request.timeframe, provider: request.provider,
-      from: request.candles[0]!.time, to: request.candles[request.candles.length - 1]!.time,
+      from: request.candles[0]?.time ?? 0,
+      to: request.candles[request.candles.length - 1]?.time ?? 0,
       candleCount: request.candles.length,
     },
     assumptions: {
