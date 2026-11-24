@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LiveMarketName, Timeframe } from "@market/contracts";
 import { INDICATOR_CATALOG, type IndicatorId, type PriceSource } from "../chart/indicators";
 import { CHART_TYPE_OPTIONS, type ChartType } from "../chart/chart-types";
@@ -95,6 +95,8 @@ export function ChartPanel({
   const [replayState, setReplayState] = useState<{ context: string; session: ReplaySession } | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const dockPointerStart = useRef<number | null>(null);
   const replay = replayState?.context === replayKey ? replayState.session : null;
 
   useEffect(() => {
@@ -190,7 +192,19 @@ export function ChartPanel({
       <header className="chart-panel-heading">
         <div className="chart-panel-instrument">
           <span className="chart-panel-symbol">{displaySymbol(panel.market, panel.symbol)}</span>
-          <span className="chart-panel-timeframe">{panel.timeframe}</span>
+          <details className="chart-timeframe-control chart-timeframe-picker">
+            <summary aria-label={`Select timeframe, current ${panel.timeframe}`}>
+              <span className="chart-timeframe-current">{panel.timeframe.toUpperCase()}</span>
+              <span className="chart-timeframe-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <fieldset className="chart-timeframe-options">
+              <legend className="sr-only">{`Timeframes for ${panel.id}`}</legend>
+              {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
+                <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
+                  onClick={() => changeTimeframe(timeframe)}>{timeframe.toUpperCase()}</button>
+              ))}
+            </fieldset>
+          </details>
         </div>
         <span className="chart-panel-status" data-status={replay ? "replay" : status} aria-live="polite">
           <span className="status-dot" />
@@ -198,6 +212,26 @@ export function ChartPanel({
         </span>
       </header>
 
+      <div className={mobileToolsOpen ? "chart-tools-dock is-open" : "chart-tools-dock"}>
+        <button type="button" className="chart-tools-dock-handle"
+          aria-expanded={mobileToolsOpen}
+          aria-label={mobileToolsOpen ? "Collapse chart tools" : "Expand chart tools"}
+          onPointerDown={(event) => { dockPointerStart.current = event.clientY; }}
+          onPointerUp={(event) => {
+            if (dockPointerStart.current === null) return;
+            const delta = event.clientY - dockPointerStart.current;
+            dockPointerStart.current = null;
+            if (Math.abs(delta) > 18) {
+              setMobileToolsOpen(delta < 0);
+              event.preventDefault();
+            }
+          }}
+          onClick={() => setMobileToolsOpen((open) => !open)}>
+          <span className="chart-tools-grip" aria-hidden="true" />
+          <span>{mobileToolsOpen ? "Hide chart tools" : "Chart tools"}</span>
+          <span aria-hidden="true">{mobileToolsOpen ? "⌄" : "⌃"}</span>
+        </button>
+        <div className="chart-tools-dock-content">
       <div className="chart-panel-controls">
         <label>
           <span>Market</span>
@@ -222,27 +256,7 @@ export function ChartPanel({
             ))}
           </select>
         </label>
-        <div className="chart-timeframe-control">
-          <span>TIMEFRAME</span>
-          <fieldset className="chart-timeframe-buttons">
-            <legend className="sr-only">{`Quick timeframes for ${panel.id}`}</legend>
-            {(["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const)
-              .filter((timeframe) => SUPPORTED_TIMEFRAMES[panel.market].includes(timeframe))
-              .map((timeframe) => (
-                <button key={timeframe} type="button" aria-pressed={panel.timeframe === timeframe}
-                  onClick={() => changeTimeframe(timeframe)}>{timeframe}</button>
-              ))}
-          </fieldset>
-          <label className="chart-timeframe-more">
-            <span className="sr-only">All timeframes</span>
-            <select aria-label={`All timeframes for ${panel.id}`} value={panel.timeframe}
-              onChange={(event) => changeTimeframe(event.currentTarget.value as Timeframe)}>
-              {SUPPORTED_TIMEFRAMES[panel.market].map((timeframe) => (
-                <option key={timeframe} value={timeframe}>{timeframe}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+
         <label>
           <span>Chart type</span>
           <select aria-label={`Chart type for ${panel.id}`} value={panel.chartType}
@@ -405,6 +419,8 @@ export function ChartPanel({
           Replay uses a fixed historical snapshot. Indicators only receive candles up to the replay cursor.
         </span>
       </fieldset>
+        </div>
+      </div>
 
       <MarketChart
         candles={chartCandles}
