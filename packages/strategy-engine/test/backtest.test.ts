@@ -27,6 +27,7 @@ test("uses next-candle open fills and reports out-of-sample trades separately", 
   assert.equal(trade.netPnl, -125);
   assert.equal(result.outOfSample.trades.length, 1);
   assert.equal(result.outOfSample.metrics.endingEquity, 875);
+  assert.equal(result.overall.metrics.maxDrawdownPct, 37.5);
   assert.equal(result.inSample.trades.length, 0);
 });
 
@@ -34,9 +35,9 @@ test("applies fees, spread and slippage to fills", async () => {
   const result = await runBacktest({ ...base, feeBps: 10, spreadBps: 20, slippageBps: 5 });
   const trade = result.overall.trades[0];
   assert.ok(trade);
-  assert.ok(trade.entryPrice > 4);
-  assert.ok(trade.exitPrice < 3);
-  assert.ok(trade.netPnl < -125);
+  assert.equal(trade.entryPrice, 4.006);
+  assert.equal(trade.exitPrice, 2.9955);
+  assert.ok(Math.abs(trade.netPnl - (-126.87032139104031)) < 1e-10);
 });
 
 test("rejects unordered candles and invalid position sizing", async () => {
