@@ -254,7 +254,11 @@ export function moveWatchlistSymbol(
   const targetIndex = direction === "up" ? index - 1 : index + 1;
   if (index < 0 || targetIndex < 0 || targetIndex >= list.items.length) return collection;
   const items = [...list.items];
-  [items[index], items[targetIndex]] = [items[targetIndex]!, items[index]!];
+  const movingItem = items[index];
+  const targetItem = items[targetIndex];
+  if (!movingItem || !targetItem) return collection;
+  items[index] = targetItem;
+  items[targetIndex] = movingItem;
   return withList(collection, { ...list, items, updatedAt: now });
 }
 
