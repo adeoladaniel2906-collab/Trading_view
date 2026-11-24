@@ -1,0 +1,28 @@
+{
+  "name": "@market/strategy-engine",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm --filter @market/script-runtime build && tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@market/contracts": "workspace:*",
+    "@market/script-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

@@ -11,7 +11,7 @@
       "import": "./dist/index.js"
     },
     "./node": {
-      "types": "./dist/node.d.ts",
+      "types": "./src/node.ts",
       "import": "./dist/node.js"
     }
   },
