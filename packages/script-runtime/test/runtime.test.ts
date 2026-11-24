@@ -42,3 +42,10 @@ test("enforces source and candle budgets", () => {
   assert.throws(() => parseScript(" ".repeat(20), { maxSourceLength: 10, maxTokens: 10, maxAstNodes: 10, maxBars: 10, maxOperations: 100, maxPlots: 2 }), ScriptError);
   assert.throws(() => executeScript("plot close;", candles, { maxSourceLength: 100, maxTokens: 100, maxAstNodes: 100, maxBars: 4, maxOperations: 100, maxPlots: 2 }), ScriptError);
 });
+
+import { executeScriptIsolated } from "../src/node.js";
+
+test("runs scripts in a resource-limited worker thread", async () => {
+  const result = await executeScriptIsolated("plot sma(close, 2);", candles);
+  assert.deepEqual(result.plots[0]?.values, [null, 1.5, 2.5, 3.5, 4.5]);
+});
